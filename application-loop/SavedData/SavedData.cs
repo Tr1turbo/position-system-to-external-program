@@ -37,6 +37,11 @@ public class SavedData
     public float roboticsRotateSystemAngleDegPitch = 0f;
     public float roboticsOffsetAngleDegR2 = 0f;
 
+    public bool roboticsUseSimulatedTwistFromLateral = true;
+    public bool roboticsUseSimulatedTwistFromRoll = false;
+    public float roboticsSimulatedTwistFromLateral = 1f;
+    public float roboticsSimulatedTwistFromRoll = 1f;
+
     public bool useWebsockets = false;
     
     public string locale = "en";

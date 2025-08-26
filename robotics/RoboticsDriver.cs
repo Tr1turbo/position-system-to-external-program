@@ -25,6 +25,9 @@ public class RoboticsDriver
     private bool _configCompensateVirtualSpaceHardLimit = true;
     private float _configRotateSystemAngleDegPitch = 0f;
     
+    private float _configTwistFromRoll;
+    private float _configTwistFromLateral;
+    
     //
     
     private Quaternion _precalculatedPitcher = Quaternion.Identity;
@@ -162,7 +165,17 @@ public class RoboticsDriver
                     }
                     else
                     {
-                        _unsafeAngleDegR0 = 0; // Normals have no twist, so we cannot set this.
+                        // Normals have no twist, so this needs to be simulated.
+                        if (_configTwistFromLateral != 0 || _configTwistFromRoll != 0)
+                        {
+                            var L2_Lateral = Clamp(unclampedVector.Z, -1f, 1f);
+                            var R1_Roll = NormalToDegrees(-reorientedNormal.Z);
+                            _unsafeAngleDegR0 = Clamp(_configTwistFromLateral * L2_Lateral * 135f + _configTwistFromRoll * R1_Roll, -135f, 135f);
+                        }
+                        else
+                        {
+                            _unsafeAngleDegR0 = 0;
+                        }
                     }
                     _unsafeAngleDegR1 = NormalToDegrees(-reorientedNormal.Z);
                     _unsafeAngleDegR2 = NormalToDegrees(reorientedNormal.Y);
@@ -291,20 +304,14 @@ public class RoboticsDriver
         return angleDegrees;
     }
 
-    public void UpdateConfiguration(float configRoboticsVirtualScale,
-        bool configRoboticsSafetyUsePolarMode,
-        bool configRoboticsUsePidRoot,
-        bool configRoboticsUsePidTarget,
-        float configTopmostHardLimit,
-        float configBottommostHardLimit,
-        float configOffsetAngleDegR2,
-        float configRotateSystemAngleDegPitch,
-        bool configCompensateVirtualScaleHardLimit)
+    public void UpdateConfiguration(RoboticsConfiguration config)
     {
-        _configVirtualScale = configRoboticsVirtualScale;
-        _configSafetyUsePolarMode = configRoboticsSafetyUsePolarMode;
-        _configUsePidRoot = configRoboticsUsePidRoot;
-        _configUsePidTarget = configRoboticsUsePidTarget;
+        _configVirtualScale = config.RoboticsVirtualScale;
+        _configSafetyUsePolarMode = config.RoboticsSafetyUsePolarMode;
+        _configUsePidRoot = config.RoboticsUsePidRoot;
+        _configUsePidTarget = config.RoboticsUsePidTarget;
+        var configBottommostHardLimit = config.BottommostHardLimit;
+        var configTopmostHardLimit = config.TopmostHardLimit;
         if (configBottommostHardLimit >= configTopmostHardLimit)
         {
             configBottommostHardLimit = configTopmostHardLimit - 0.001f;
@@ -330,9 +337,9 @@ public class RoboticsDriver
             _configBottommostHardLimit_ZeroToNeverOne = 0f;
         }
         
-        _configCompensateVirtualSpaceHardLimit = configCompensateVirtualScaleHardLimit;
-        _offsetAngleDegR2 = configOffsetAngleDegR2;
-        _configRotateSystemAngleDegPitch = configRotateSystemAngleDegPitch;
+        _configCompensateVirtualSpaceHardLimit = config.CompensateVirtualScaleHardLimit;
+        _offsetAngleDegR2 = config.OffsetAngleDegR2;
+        _configRotateSystemAngleDegPitch = config.RotateSystemAngleDegPitch;
         
         //
         
@@ -346,5 +353,25 @@ public class RoboticsDriver
         {
             _precalculatedEffectiveVirtualScale = _configVirtualScale;
         }
+
+        _configTwistFromRoll = config.UseSimulatedTwistFromRoll ? config.SimulatedTwistFromRoll : 0f;
+        _configTwistFromLateral = config.UseSimulatedTwistFromLateral ? config.SimulatedTwistFromLateral : 0f;
+    }
+    
+    public struct RoboticsConfiguration
+    {
+        public float RoboticsVirtualScale { get; init; }
+        public bool RoboticsSafetyUsePolarMode { get; init; }
+        public bool RoboticsUsePidRoot { get; init; }
+        public bool RoboticsUsePidTarget { get; init; }
+        public float TopmostHardLimit { get; init; }
+        public float BottommostHardLimit { get; init; }
+        public float OffsetAngleDegR2 { get; init; }
+        public float RotateSystemAngleDegPitch { get; init; }
+        public bool CompensateVirtualScaleHardLimit { get; init; }
+        public bool UseSimulatedTwistFromRoll { get; init; }
+        public float SimulatedTwistFromRoll { get; init; }
+        public bool UseSimulatedTwistFromLateral { get; init; }
+        public float SimulatedTwistFromLateral { get; init; }
     }
 }

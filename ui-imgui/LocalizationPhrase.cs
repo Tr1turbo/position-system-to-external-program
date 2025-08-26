@@ -87,5 +87,12 @@ public class LocalizationPhrase
         
         // 1.1.0
         public static string LimitMinimumHeightLabel => LocalizeOrElse(nameof(LimitMinimumHeightLabel), "Limit minimum height");
+        
+        // 1.2.0
+        public static string TwistLabel => LocalizeOrElse(nameof(TwistLabel), "Twist");
+        public static string UseSimulatedTwistFromRollLabel => LocalizeOrElse(nameof(UseSimulatedTwistFromRollLabel), "Use simulated twist from Roll");
+        public static string UseSimulatedTwistFromLateralLabel => LocalizeOrElse(nameof(UseSimulatedTwistFromLateralLabel), "Use simulated twist from Lateral");
+        public static string SimulatedTwistFromRollLabel => LocalizeOrElse(nameof(SimulatedTwistFromRollLabel), "Simulated twist from Roll");
+        public static string SimulatedTwistFromLateralLabel => LocalizeOrElse(nameof(SimulatedTwistFromLateralLabel), "Simulated twist from Lateral");
     }
 }

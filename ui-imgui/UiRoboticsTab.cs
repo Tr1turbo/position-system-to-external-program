@@ -85,7 +85,28 @@ public class UiRoboticsTab
             anyRoboticsConfigurationChanged = true;
         }
         if (_config.roboticsOffsetAngleDegR2 != 0f) ResetButtonWarning(LocalizationPhrase.RoboticsLocalizationPhrase.MsgNotDefaultWarning);
-            
+        
+        ImGui.NewLine();
+        ImGui.SeparatorText(LocalizationPhrase.RoboticsLocalizationPhrase.TwistLabel);
+
+        anyRoboticsConfigurationChanged |= ImGui.Checkbox(LocalizationPhrase.RoboticsLocalizationPhrase.UseSimulatedTwistFromRollLabel, ref _config.roboticsUseSimulatedTwistFromRoll);
+        ImGui.BeginDisabled(!_config.roboticsUseSimulatedTwistFromRoll);
+        anyRoboticsConfigurationChanged |= ImGui.SliderFloat(LocalizationPhrase.RoboticsLocalizationPhrase.SimulatedTwistFromRollLabel, ref _config.roboticsSimulatedTwistFromRoll, -5f, 5f);
+        ImGui.EndDisabled();
+        anyRoboticsConfigurationChanged |= ImGui.Checkbox(LocalizationPhrase.RoboticsLocalizationPhrase.UseSimulatedTwistFromLateralLabel, ref _config.roboticsUseSimulatedTwistFromLateral);
+        ImGui.BeginDisabled(!_config.roboticsUseSimulatedTwistFromLateral);
+        anyRoboticsConfigurationChanged |= ImGui.SliderFloat(LocalizationPhrase.RoboticsLocalizationPhrase.SimulatedTwistFromLateralLabel, ref _config.roboticsSimulatedTwistFromLateral, -5f, 5f);
+        ImGui.EndDisabled();
+        
+        if (ImGui.Button($"{LocalizationPhrase.RoboticsLocalizationPhrase.ResetLabel}##reset_twist"))
+        {
+            _config.roboticsUseSimulatedTwistFromRoll = false;
+            _config.roboticsUseSimulatedTwistFromLateral = true;
+            _config.roboticsSimulatedTwistFromRoll = 1f;
+            _config.roboticsSimulatedTwistFromLateral = 1f;
+            anyRoboticsConfigurationChanged = true;
+        }
+
         ImGui.NewLine();
         ImGui.SeparatorText(LocalizationPhrase.RoboticsLocalizationPhrase.SafetySettingsLabel);
         anyRoboticsConfigurationChanged |= ImGui.Checkbox(LocalizationPhrase.RoboticsLocalizationPhrase.LimitLateralMovementAtTheBottom, ref _config.roboticsSafetyUsePolarMode);

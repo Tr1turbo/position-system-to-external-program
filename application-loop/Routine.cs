@@ -69,16 +69,23 @@ public class Routine
     
     public void RefreshRoboticsConfiguration()
     {
-        _roboticsDriver.UpdateConfiguration(
-            configRoboticsVirtualScale: _config.roboticsVirtualScale,
-            configRoboticsSafetyUsePolarMode: _config.roboticsSafetyUsePolarMode,
-            configRoboticsUsePidRoot: _config.roboticsUsePidRoot,
-            configRoboticsUsePidTarget: _config.roboticsUsePidTarget,
-            configTopmostHardLimit: _config.roboticsTopmostHardLimit,
-            configBottommostHardLimit: _config.roboticsBottommostHardLimit,
-            configOffsetAngleDegR2: _config.roboticsOffsetAngleDegR2,
-            configRotateSystemAngleDegPitch: _config.roboticsRotateSystemAngleDegPitch,
-            configCompensateVirtualScaleHardLimit: _config.roboticsCompensateVirtualScaleHardLimit);
+        _roboticsDriver.UpdateConfiguration(new RoboticsDriver.RoboticsConfiguration
+            {
+                RoboticsVirtualScale = _config.roboticsVirtualScale,
+                RoboticsSafetyUsePolarMode = _config.roboticsSafetyUsePolarMode,
+                RoboticsUsePidRoot = _config.roboticsUsePidRoot,
+                RoboticsUsePidTarget = _config.roboticsUsePidTarget,
+                TopmostHardLimit = _config.roboticsTopmostHardLimit,
+                BottommostHardLimit = _config.roboticsBottommostHardLimit,
+                OffsetAngleDegR2 = _config.roboticsOffsetAngleDegR2,
+                RotateSystemAngleDegPitch = _config.roboticsRotateSystemAngleDegPitch,
+                CompensateVirtualScaleHardLimit = _config.roboticsCompensateVirtualScaleHardLimit,
+                UseSimulatedTwistFromRoll = _config.roboticsUseSimulatedTwistFromRoll,
+                SimulatedTwistFromRoll = _config.roboticsSimulatedTwistFromRoll,
+                UseSimulatedTwistFromLateral = _config.roboticsUseSimulatedTwistFromLateral,
+                SimulatedTwistFromLateral = _config.roboticsSimulatedTwistFromLateral
+            }
+        );
     }
 
     public void RefreshWebsocketsConfiguration()
@@ -284,7 +291,7 @@ public class Routine
         RawSerialData.L0 = RemapTarget(roboticsCoordinates.JoystickTargetL0);
         RawSerialData.L1 = RemapTarget(roboticsCoordinates.JoystickTargetL1);
         RawSerialData.L2 = RemapTarget(roboticsCoordinates.JoystickTargetL2);
-        RawSerialData.R0 = RemapTarget(roboticsCoordinates.AngleDegR0 / 35f);
+        RawSerialData.R0 = RemapTarget(roboticsCoordinates.AngleDegR0 / 135f); // Twist
         RawSerialData.R1 = RemapTarget(roboticsCoordinates.AngleDegR1 / 35f);
         RawSerialData.R2 = RemapTarget(roboticsCoordinates.AngleDegR2 / 35f);
         
