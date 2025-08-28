@@ -53,6 +53,11 @@ public class LocalizationPhrase
         public static string MsgOpenVrUnavailable => LocalizeOrElse(nameof(MsgOpenVrUnavailable), "OpenVR is not running.");
         public static string MsgShaderDoesNotSupportCameraPosition => LocalizeOrElse(nameof(MsgShaderDoesNotSupportCameraPosition), "Detected shader version is {0}, which does not support camera position (minimum required: {1})");
         public static string MsgSpoutUnavailable => LocalizeOrElse(nameof(MsgSpoutUnavailable), "Spout is not yet available in this version of the software.");
+        
+        // 1.2.0
+        public static string WirelessLabel => LocalizeOrElse(nameof(WirelessLabel), "Wireless");
+        public static string LimitMessageRateLabel => LocalizeOrElse(nameof(LimitMessageRateLabel), "Limit message rate");
+        public static string MessagesPerSecondLabel => LocalizeOrElse(nameof(MessagesPerSecondLabel), "Messages per second");
     }
 
     public class RoboticsLocalizationPhrase

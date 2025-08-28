@@ -45,7 +45,7 @@ public class Routine
     private bool _exitRequested;
     private double _nextStartOpenVrTime;
     private int _lastExtractionIteration;
-    private long _lastRoboticsUpdate;
+    private long _lastRoboticsUpdateMs;
     private bool _websocketStarted;
 
     private bool _hasReceivedDirectLightData;
@@ -284,20 +284,22 @@ public class Routine
             VirtualScale = _scaleEvaluator.VirtualScale;
         }
 
-        // TODO: Split image extraction logic update rate from robotics logic update rate.
-        var roboticsCoordinates = _roboticsDriver.UpdateAndGetCoordinates(_lastRoboticsUpdate == 0 ? 10L : _globalStopwatch.ElapsedMilliseconds - _lastRoboticsUpdate);
-        _lastRoboticsUpdate = _globalStopwatch.ElapsedMilliseconds;
-
-        RawSerialData.L0 = RemapTarget(roboticsCoordinates.JoystickTargetL0);
-        RawSerialData.L1 = RemapTarget(roboticsCoordinates.JoystickTargetL1);
-        RawSerialData.L2 = RemapTarget(roboticsCoordinates.JoystickTargetL2);
-        RawSerialData.R0 = RemapTarget(roboticsCoordinates.AngleDegR0 / 135f); // Twist
-        RawSerialData.R1 = RemapTarget(roboticsCoordinates.AngleDegR1 / 35f);
-        RawSerialData.R2 = RemapTarget(roboticsCoordinates.AngleDegR2 / 35f);
-        
-        if (_serial.IsOpen && RawSerialData.autoUpdate)
+        if (!_config.wirelessLimitMessageRate || _globalStopwatch.ElapsedMilliseconds - _lastRoboticsUpdateMs > (1000f / _config.messagesPerSecond))
         {
-            Submit();
+            var roboticsCoordinates = _roboticsDriver.UpdateAndGetCoordinates(_lastRoboticsUpdateMs == 0 ? 10L : _globalStopwatch.ElapsedMilliseconds - _lastRoboticsUpdateMs);
+            _lastRoboticsUpdateMs = _globalStopwatch.ElapsedMilliseconds;
+
+            RawSerialData.L0 = RemapTarget(roboticsCoordinates.JoystickTargetL0);
+            RawSerialData.L1 = RemapTarget(roboticsCoordinates.JoystickTargetL1);
+            RawSerialData.L2 = RemapTarget(roboticsCoordinates.JoystickTargetL2);
+            RawSerialData.R0 = RemapTarget(roboticsCoordinates.AngleDegR0 / 135f); // Twist
+            RawSerialData.R1 = RemapTarget(roboticsCoordinates.AngleDegR1 / 35f);
+            RawSerialData.R2 = RemapTarget(roboticsCoordinates.AngleDegR2 / 35f);
+        
+            if (_serial.IsOpen && RawSerialData.autoUpdate)
+            {
+                Submit();
+            }
         }
         
         // Limit logic to 100 fps, we don't want to extract images too fast

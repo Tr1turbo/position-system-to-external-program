@@ -45,6 +45,9 @@ public class SavedData
     public bool useWebsockets = false;
     
     public string locale = "en";
+    
+    public bool wirelessLimitMessageRate;
+    public int messagesPerSecond = 20;
 
     public void SetWindowCoordinatesToDefault()
     {

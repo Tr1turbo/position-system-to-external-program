@@ -141,6 +141,26 @@ public class UiMainApplication
                 _uiActions.ConfigRoboticsUpdated();
             }
         });
+        _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.WirelessLabel, () =>
+        {
+            anyChanged |= ImGui.Checkbox(LocalizationPhrase.MainLocalizationPhrase.LimitMessageRateLabel, ref _config.wirelessLimitMessageRate);
+            anyChanged |= ImGui.SliderInt(LocalizationPhrase.MainLocalizationPhrase.MessagesPerSecondLabel, ref _config.messagesPerSecond, 5, 100);
+            if (ImGui.Button($"{LocalizationPhrase.RoboticsLocalizationPhrase.ResetLabel}##reset_wireless"))
+            {
+                _config.wirelessLimitMessageRate = false;
+                _config.messagesPerSecond = 20;
+                anyChanged = true;
+            }
+            
+            ImGui.NewLine();
+            ImGui.Separator();
+            ImGui.SliderInt("L0", ref rawData.L0, 0, 9999);
+            ImGui.SliderInt("L1", ref rawData.L1, 0, 9999);
+            ImGui.SliderInt("L2", ref rawData.L2, 0, 9999);
+            ImGui.SliderInt("R0", ref rawData.R0, 0, 9999);
+            ImGui.SliderInt("R1", ref rawData.R1, 0, 9999);
+            ImGui.SliderInt("R2", ref rawData.R2, 0, 9999);
+        });
         _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.DataCalibrationLabel, () =>
         {
             ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.ExtractorPreferenceLabel);
