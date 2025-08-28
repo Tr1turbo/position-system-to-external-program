@@ -144,7 +144,10 @@ public class UiMainApplication
         _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.WirelessLabel, () =>
         {
             anyChanged |= ImGui.Checkbox(LocalizationPhrase.MainLocalizationPhrase.LimitMessageRateLabel, ref _config.wirelessLimitMessageRate);
-            anyChanged |= ImGui.SliderInt(LocalizationPhrase.MainLocalizationPhrase.MessagesPerSecondLabel, ref _config.messagesPerSecond, 5, 100);
+            if (_config.wirelessLimitMessageRate)
+            {
+                anyChanged |= ImGui.SliderInt(LocalizationPhrase.MainLocalizationPhrase.MessagesPerSecondLabel, ref _config.messagesPerSecond, 5, 100);
+            }
             if (ImGui.Button($"{LocalizationPhrase.RoboticsLocalizationPhrase.ResetLabel}##reset_wireless"))
             {
                 _config.wirelessLimitMessageRate = false;
