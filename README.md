@@ -236,7 +236,7 @@ Dependencies included through NuGet:
 - ImGui.NET @ https://github.com/ImGuiNET/ImGui.NET ([MIT license](https://github.com/ImGuiNET/ImGui.NET/blob/master/LICENSE)) by Eric Mellino and ImGui.NET contributors
 - Veldrid @ https://github.com/veldrid/veldrid ([MIT license](https://github.com/veldrid/veldrid/blob/master/LICENSE)) by Eric Mellino and Veldrid contributors
 - Vortice.Windows @ https://github.com/amerkoleci/Vortice.Windows ([MIT license](https://github.com/amerkoleci/Vortice.Windows/blob/main/LICENSE)) by Amer Koleci and Contributors
-- Buttplug @ https://github.com/buttplugio/buttplug-csharp by [BSD 3-Clause](https://github.com/buttplugio/buttplug-csharp?tab=License-1-ov-file#readme) by Nonpolynomial Labs, LLC
+- Buttplug @ https://github.com/buttplugio/buttplug-csharp ([BSD 3-Clause](https://github.com/buttplugio/buttplug-csharp/blob/master/LICENSE)) by Nonpolynomial Labs, LLC
 - (there may be other implicit packages)
 
 Asset dependencies:
