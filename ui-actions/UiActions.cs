@@ -56,7 +56,7 @@ public class UiActions : IUiActions
     public InterpretedLightData InterpretedData() => _routine.InterpretedData;
     public float VirtualScale() => _routine.VirtualScale;
 
-    public string[] FetchPortNames()
+    public Dictionary<string, string> FetchPortNames()
     {
         return _routine.FetchPortNames();
     }

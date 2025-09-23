@@ -28,6 +28,7 @@ public class UiMainApplication
     private readonly string[] _extractorNames;
 
     private readonly UiRoboticsTab _roboticsTab;
+    private Dictionary<string, string> _portDetail;
 
     public UiMainApplication(IUiActions uiActions, SavedData config)
     {
@@ -70,12 +71,12 @@ public class UiMainApplication
         var isAnyOpen = isSerialOpen || isIntifaceOpen;
         {
             ImGui.BeginDisabled(isSerialOpen);
-            if (ImGui.BeginCombo("##PortCombo", _selectedPortName))
+            if (ImGui.BeginCombo("##PortCombo", _portDetail.TryGetValue(_selectedPortName, out var value) ? value : _selectedPortName))
             {
                 for (int i = 0; i < _portNames.Length; i++)
                 {
                     bool isSelected = (_selectedPortIndex == i);
-                    if (ImGui.Selectable(_portNames[i], isSelected))
+                    if (ImGui.Selectable(_portDetail[_portNames[i]], isSelected))
                     {
                         _selectedPortIndex = i;
                         _selectedPortName = _portNames[i];
@@ -522,6 +523,8 @@ public class UiMainApplication
 
     private void UpdatePortNames()
     {
-        _portNames = _uiActions.FetchPortNames();
+        var fetchPortNames = _uiActions.FetchPortNames();
+        _portNames = fetchPortNames.Keys.ToArray();
+        _portDetail = fetchPortNames;
     }
 }

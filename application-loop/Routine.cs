@@ -200,9 +200,9 @@ public class Routine
         }
     }
 
-    public string[] FetchPortNames()
+    public Dictionary<string, string> FetchPortNames()
     {
-        return _serial.FetchPortNames();
+        return _serial.FetchDetailedPortNames();
     }
 
     public async Task TryConnectSerial(string portName)

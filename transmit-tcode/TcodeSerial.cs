@@ -1,4 +1,5 @@
 ﻿using System.IO.Ports;
+using System.Management;
 using System.Numerics;
 using Hai.PositionSystemToExternalProgram.Core;
 
@@ -17,6 +18,42 @@ public class TcodeSerial : ITransmitter
     public string[] FetchPortNames()
     {
         return SerialPort.GetPortNames();
+    }
+
+    public Dictionary<string, string> FetchDetailedPortNames()
+    {
+        var portNames = new Dictionary<string, string>();
+        
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_SerialPort");
+
+            var results = searcher.Get();
+            foreach (var mo in results)
+            {
+                var queryObj = (ManagementObject)mo;
+                var portName = queryObj["DeviceID"]?.ToString();
+                var description = queryObj["Description"]?.ToString();
+                var name = queryObj["Name"]?.ToString();
+                    
+                if (!string.IsNullOrEmpty(portName))
+                {
+                    var friendlyName = !string.IsNullOrEmpty(description) ? $"{description} ({portName})"
+                        : !string.IsNullOrEmpty(name) ? $"{name} ({portName})"
+                        : portName;
+                        
+                    portNames[portName] = friendlyName;
+                }
+            }
+
+            return portNames;
+        }
+        catch (Exception)
+        {
+            // ignored
+        }
+
+        return SerialPort.GetPortNames().ToDictionary(s => s, s => s);
     }
     
     public bool IsOpen() => _port != null && _ready;

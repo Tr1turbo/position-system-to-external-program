@@ -18,7 +18,7 @@ public interface IUiActions
     DecodedData Data();
     InterpretedLightData InterpretedData();
     float VirtualScale();
-    string[] FetchPortNames();
+    Dictionary<string, string> FetchPortNames();
     void ConfigCoordinatesUpdated();
     void ConfigRoboticsUpdated();
     void ConfigWebsocketsUpdated();
