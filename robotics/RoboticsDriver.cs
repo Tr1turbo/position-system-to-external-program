@@ -64,6 +64,8 @@ public class RoboticsDriver
     private float _safeAngleDegTargetR0 = 0; 
     private float _safeAngleDegTargetR1 = 0; 
     private float _safeAngleDegTargetR2 = 0;
+    
+    private float _safeBoundedL0 = 0;
 
     public RoboticsDriver()
     {
@@ -241,6 +243,8 @@ public class RoboticsDriver
         _safeAngleDegTargetR0 = Clamp(_unsafeAngleDegR0 + _offsetAngleDegR0, -360f, 360f);
         _safeAngleDegTargetR1 = Clamp(_unsafeAngleDegR1 + _offsetAngleDegR1, -65f, 65f);
         _safeAngleDegTargetR2 = Clamp(_unsafeAngleDegR2 + _offsetAngleDegR2, -65f, 65f);
+
+        _safeBoundedL0 = Clamp(whichVector.X, -1, 1);
     }
 
     public void MarkDataFailure()
@@ -272,6 +276,8 @@ public class RoboticsDriver
             AngleDegR0 = _safeAngleDegTargetR0,
             AngleDegR1 = _safeAngleDegTargetR1,
             AngleDegR2 = _safeAngleDegTargetR2,
+            
+            JoystickBoundedL0 = _safeBoundedL0
         };
     }
 

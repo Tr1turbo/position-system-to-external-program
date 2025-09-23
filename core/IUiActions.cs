@@ -4,7 +4,10 @@ public interface IUiActions
 {
     void ConnectSerial(string portName);
     void DisconnectSerial();
+    void ConnectIntiface(ushort portNumber);
+    void DisconnectIntiface();
     bool IsSerialOpen();
+    bool IsIntifaceOpen();
     TcodeData ExposeRawData();
     bool IsOpenVrRunning();
     bool IsUsingVrExtractor();

@@ -13,6 +13,7 @@
         <ProjectReference Include="..\extractor-openvr\extractor-openvr.csproj"/>
         <ProjectReference Include="..\robotics\robotics.csproj" />
         <ProjectReference Include="..\config\config.csproj" />
+        <ProjectReference Include="..\transmit-intiface\transmit-intiface.csproj" />
         <ProjectReference Include="..\transmit-tcode\transmit-tcode.csproj" />
     </ItemGroup>
 </Project>

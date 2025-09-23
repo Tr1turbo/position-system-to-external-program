@@ -60,54 +60,93 @@ public class UiMainApplication
     private void DrawMain(CustomImGuiController controller, Sdl2Window window)
     {
         var rawData = _uiActions.ExposeRawData();
-        var isSerialOpen = _uiActions.IsSerialOpen();
         var isOpenVrRunning = _uiActions.IsOpenVrRunning();
         var data = _uiActions.Data();
-        
-        ImGui.BeginDisabled(isSerialOpen);
-        if (ImGui.BeginCombo("##PortCombo", _selectedPortName))
-        {
-            for (int i = 0; i < _portNames.Length; i++)
-            {
-                bool isSelected = (_selectedPortIndex == i);
-                if (ImGui.Selectable(_portNames[i], isSelected))
-                {
-                    _selectedPortIndex = i;
-                    _selectedPortName = _portNames[i];
-                }
-                    
-                if (isSelected)
-                {
-                    ImGui.SetItemDefaultFocus();
-                }
-            }
-            ImGui.EndCombo();
-        }
-        ImGui.SameLine();
-        if (ImGui.Button(LocalizationPhrase.MainLocalizationPhrase.RefreshLabel))
-        {
-            UpdatePortNames();
-        }
-        ImGui.EndDisabled();
+        var anyChanged = false;
 
-        if (isSerialOpen)
+        #region serial
+        var isSerialOpen = _uiActions.IsSerialOpen();
+        var isIntifaceOpen = _uiActions.IsIntifaceOpen();
+        var isAnyOpen = isSerialOpen || isIntifaceOpen;
         {
-            ImGui.SameLine();
-            if (ImGui.Button(LocalizationPhrase.MainLocalizationPhrase.CloseSerialLabel))
+            ImGui.BeginDisabled(isSerialOpen);
+            if (ImGui.BeginCombo("##PortCombo", _selectedPortName))
             {
-                _uiActions.DisconnectSerial();
+                for (int i = 0; i < _portNames.Length; i++)
+                {
+                    bool isSelected = (_selectedPortIndex == i);
+                    if (ImGui.Selectable(_portNames[i], isSelected))
+                    {
+                        _selectedPortIndex = i;
+                        _selectedPortName = _portNames[i];
+                    }
+                    
+                    if (isSelected)
+                    {
+                        ImGui.SetItemDefaultFocus();
+                    }
+                }
+                ImGui.EndCombo();
             }
-        }
-        else
-        {
-            ImGui.BeginDisabled(_selectedPortName == "");
-            var port = (_selectedPortName == "" ? "UNKNOWN" : _selectedPortName);
-            if (ImGui.Button(string.Format(LocalizationPhrase.MainLocalizationPhrase.MsgConnectToDeviceOnSerialPort, port), new Vector2(ImGui.GetContentRegionAvail().X, 60)))
+            ImGui.SameLine();
+            if (ImGui.Button(LocalizationPhrase.MainLocalizationPhrase.RefreshLabel))
             {
-                _uiActions.ConnectSerial(_selectedPortName);
+                UpdatePortNames();
             }
             ImGui.EndDisabled();
+
+            if (isSerialOpen)
+            {
+                ImGui.SameLine();
+                if (ImGui.Button(LocalizationPhrase.MainLocalizationPhrase.CloseSerialLabel))
+                {
+                    _uiActions.DisconnectSerial();
+                }
+            }
+            else
+            {
+                ImGui.BeginDisabled(_selectedPortName == "");
+                var port = (_selectedPortName == "" ? "UNKNOWN" : _selectedPortName);
+                if (isAnyOpen) ImGui.SameLine();
+                if (ImGui.Button(string.Format(LocalizationPhrase.MainLocalizationPhrase.MsgConnectToDeviceOnSerialPort, port), isAnyOpen ? Vector2.Zero : new Vector2(ImGui.GetContentRegionAvail().X, 60)))
+                {
+                    _uiActions.ConnectSerial(_selectedPortName);
+                }
+                ImGui.EndDisabled();
+            }
         }
+        #endregion
+        #region intiface
+        {
+            ImGui.BeginDisabled(isIntifaceOpen);
+            anyChanged |= ImGui.InputInt($"{LocalizationPhrase.MainLocalizationPhrase.IntifacePortLabel}##IntifacePort", ref _config.transmitterIntifacePort, 0);
+            ImGui.SameLine();
+            if (ImGui.Button(LocalizationPhrase.MainLocalizationPhrase.ResetIntifacePortLabel))
+            {
+                _config.transmitterIntifacePort = 12345;
+                anyChanged = true;
+            }
+            ImGui.EndDisabled();
+            if (isIntifaceOpen)
+            {
+                ImGui.SameLine();
+                if (ImGui.Button(LocalizationPhrase.MainLocalizationPhrase.DisconnectIntifaceLabel))
+                {
+                    _uiActions.DisconnectIntiface();
+                }
+            }
+            else
+            {
+                ImGui.BeginDisabled(_config.transmitterIntifacePort < 0 || _config.transmitterIntifacePort > ushort.MaxValue);
+                if (isAnyOpen) ImGui.SameLine();
+                if (ImGui.Button(string.Format(LocalizationPhrase.MainLocalizationPhrase.MsgConnectIntiface, _config.transmitterIntifacePort), isAnyOpen ? Vector2.Zero : new Vector2(ImGui.GetContentRegionAvail().X, 60)))
+                {
+                    _uiActions.ConnectIntiface((ushort)_config.transmitterIntifacePort);
+                }
+                ImGui.EndDisabled();
+            }
+        }
+        #endregion
         
         ShowDataWarningIfApplicable(data);
         if (data.validity == DataValidity.Ok)
@@ -127,7 +166,6 @@ public class UiMainApplication
             }
         }
         
-        var anyChanged = false;
         ImGui.BeginTabBar("##tabs");
         _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.RoboticsLabel, () => { anyChanged |= _roboticsTab.RoboticsTab(); });
         _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.RoboticsAdvancedLabel, () =>

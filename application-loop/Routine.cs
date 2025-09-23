@@ -7,6 +7,7 @@ using Hai.PositionSystemToExternalProgram.Core;
 using Hai.PositionSystemToExternalProgram.Tcode;
 using Hai.PositionSystemToExternalProgram.Extractors.GDI;
 using Hai.PositionSystemToExternalProgram.Decoder;
+using Hai.PositionSystemToExternalProgram.Intiface;
 using Hai.PositionSystemToExternalProgram.Robotics;
 
 namespace Hai.PositionSystemToExternalProgram.ApplicationLoop;
@@ -16,7 +17,9 @@ public class Routine
     private const int ViveProEyeVerticalBase = 3360;
     
     private readonly TcodeSerial _serial;
-    private readonly ITransmitter _transmitter;
+    private readonly IntifaceTransmitter _intiface;
+    
+    private readonly List<ITransmitter> _transmitters = new();
     private readonly OpenVrStarter _ovrStarter;
     private readonly OpenVrExtractor _ovrExtractor;
     private readonly WindowGdiExtractor _windowGdiExtractor;
@@ -122,9 +125,12 @@ public class Routine
         ExtractedDataDecoder decoder,
         DpsLightInterpreter interpreter,
         RoboticsDriver roboticsDriver,
-        TcodeSerial serial)
+        TcodeSerial serial,
+        IntifaceTransmitter intiface)
     {
         _serial = serial;
+        _intiface = intiface;
+        
         _ovrStarter = ovrStarter;
         _ovrExtractor = ovrExtractor;
         _windowGdiExtractor = windowGdiExtractor;
@@ -153,7 +159,7 @@ public class Routine
         };
 
         _scaleEvaluator = new ScaleEvaluator();
-        _transmitter = serial;
+        _transmitters = new List<ITransmitter> { serial, intiface };
     }
 
     public void Enqueue(Action action)
@@ -212,6 +218,21 @@ public class Routine
         if (!_serial.IsOpen()) return;
 
         await _serial.Close();
+    }
+
+    public async Task TryConnectIntiface(ushort portNumber)
+    {
+        if (_intiface.IsOpen()) return;
+
+        _intiface.Port = portNumber;
+        await _intiface.Open();
+    }
+
+    public async Task TryDisconnectIntiface()
+    {
+        if (!_intiface.IsOpen()) return;
+
+        await _intiface.Close();
     }
 
     private async Task Update()
@@ -325,22 +346,27 @@ public class Routine
 
     private async Task Submit(RoboticsCoordinates roboticsCoordinates)
     {
-        if (!_transmitter.IsOpen()) return;
-        
-        if (RawSerialData.autoUpdate)
+        foreach (var transmitter in _transmitters)
         {
-            RawSerialData.L0 = RemapTarget(roboticsCoordinates.JoystickTargetL0);
-            RawSerialData.L1 = RemapTarget(roboticsCoordinates.JoystickTargetL1);
-            RawSerialData.L2 = RemapTarget(roboticsCoordinates.JoystickTargetL2);
-            RawSerialData.R0 = RemapTarget(roboticsCoordinates.AngleDegR0 / 35f);
-            RawSerialData.R1 = RemapTarget(roboticsCoordinates.AngleDegR1 / 35f);
-            RawSerialData.R2 = RemapTarget(roboticsCoordinates.AngleDegR2 / 35f);
+            if (transmitter.IsOpen())
+            {
+                if (RawSerialData.autoUpdate)
+                {
+                    RawSerialData.L0 = RemapTarget(roboticsCoordinates.JoystickTargetL0);
+                    RawSerialData.L1 = RemapTarget(roboticsCoordinates.JoystickTargetL1);
+                    RawSerialData.L2 = RemapTarget(roboticsCoordinates.JoystickTargetL2);
+                    RawSerialData.R0 = RemapTarget(roboticsCoordinates.AngleDegR0 / 35f);
+                    RawSerialData.R1 = RemapTarget(roboticsCoordinates.AngleDegR1 / 35f);
+                    RawSerialData.R2 = RemapTarget(roboticsCoordinates.AngleDegR2 / 35f);
         
-            _transmitter.ProvideNewTarget(roboticsCoordinates);
-        }
+                    transmitter.ProvideNewTarget(roboticsCoordinates);
+                }
 
-        var duration = _globalStopwatch.ElapsedMilliseconds - _lastTransmissionUpdate;
-        await _transmitter.Update(_lastTransmissionUpdate == 0 ? 10L : duration > 1000 ? 1000 : duration);
+                var duration = _globalStopwatch.ElapsedMilliseconds - _lastTransmissionUpdate;
+                await transmitter.Update(_lastTransmissionUpdate == 0 ? 10L : duration > 1000 ? 1000 : duration);
+            }
+        }
+        
         _lastTransmissionUpdate = _globalStopwatch.ElapsedMilliseconds;
     }
 
@@ -352,6 +378,11 @@ public class Routine
     public bool IsSerialOpen()
     {
         return _serial.IsOpen();
+    }
+
+    public bool IsIntifaceOpen()
+    {
+        return _intiface.IsOpen();
     }
 
     public void ReceiveDirectControl(float positionX, float positionY, float positionZ, float normalX, float normalY, float normalZ)

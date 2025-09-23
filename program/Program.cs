@@ -8,6 +8,7 @@ using Hai.PositionSystemToExternalProgram.Extractors.GDI;
 using Hai.PositionSystemToExternalProgram.Decoder;
 using Hai.PositionSystemToExternalProgram.ApplicationLoop;
 using Hai.PositionSystemToExternalProgram.ImGuiProgram;
+using Hai.PositionSystemToExternalProgram.Intiface;
 using Hai.PositionSystemToExternalProgram.Robotics;
 using Hai.PositionSystemToExternalProgram.Services.Websockets;
 using Hai.PositionSystemToExternalProgram.ThirdPartyLicenses;
@@ -37,6 +38,8 @@ internal class MainApp
         Localization.InitializeAndProvideFor(config.locale);
         
         var serial = new TcodeSerial();
+        var intiface = new IntifaceTransmitter();
+        
         var ovrStarter = new OpenVrStarter();
         var ovrExtractor = new OpenVrExtractor(ovrStarter);
         var windowGdiExtractor = new WindowGdiExtractor();
@@ -48,7 +51,7 @@ internal class MainApp
         var roboticsDriver = new RoboticsDriver();
         
         // Core
-        _routine = new Routine(config, layout, ovrStarter, ovrExtractor, windowGdiExtractor, toBits, decoder, interpreter, roboticsDriver, serial);
+        _routine = new Routine(config, layout, ovrStarter, ovrExtractor, windowGdiExtractor, toBits, decoder, interpreter, roboticsDriver, serial, intiface);
         
         // Misc
         var websockets = new WebsocketsStarter(new WebsocketActions(_routine));

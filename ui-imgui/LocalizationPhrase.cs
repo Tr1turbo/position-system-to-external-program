@@ -58,6 +58,12 @@ public class LocalizationPhrase
         public static string WirelessLabel => LocalizeOrElse(nameof(WirelessLabel), "Wireless");
         public static string LimitMessageRateLabel => LocalizeOrElse(nameof(LimitMessageRateLabel), "Limit message rate");
         public static string MessagesPerSecondLabel => LocalizeOrElse(nameof(MessagesPerSecondLabel), "Messages per second");
+        
+        // 1.3.0
+        public static string MsgConnectIntiface => LocalizeOrElse(nameof(MsgConnectIntiface), "Connect to Intiface on port {0}");
+        public static string DisconnectIntifaceLabel => LocalizeOrElse(nameof(DisconnectIntifaceLabel), "Disconnect Intiface");
+        public static string IntifacePortLabel => LocalizeOrElse(nameof(IntifacePortLabel), "Intiface port");
+        public static string ResetIntifacePortLabel => LocalizeOrElse(nameof(ResetIntifacePortLabel), "Reset port");
     }
 
     public class RoboticsLocalizationPhrase

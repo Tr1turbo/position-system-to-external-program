@@ -25,9 +25,24 @@ public class UiActions : IUiActions
         _routine.EnqueueAsync(async () => await _routine.TryDisconnectSerial());
     }
 
+    public void ConnectIntiface(ushort portNumber)
+    {
+        _routine.EnqueueAsync(async () => await _routine.TryConnectIntiface(portNumber));
+    }
+
+    public void DisconnectIntiface()
+    {
+        _routine.EnqueueAsync(async () => await _routine.TryDisconnectIntiface());
+    }
+
     public bool IsSerialOpen()
     {
         return _routine.IsSerialOpen();
+    }
+
+    public bool IsIntifaceOpen()
+    {
+        return _routine.IsIntifaceOpen();
     }
 
     public TcodeData ExposeRawData() => _routine.RawSerialData;

@@ -49,6 +49,8 @@ public class SavedData
     public bool wirelessLimitMessageRate;
     public int messagesPerSecond = 20;
 
+    public int transmitterIntifacePort = 12345;
+
     public void SetWindowCoordinatesToDefault()
     {
         windowCoordinates.x = 8;

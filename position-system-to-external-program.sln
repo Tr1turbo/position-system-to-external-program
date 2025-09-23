@@ -26,6 +26,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ui-actions", "ui-actions\ui
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "config", "config\config.csproj", "{A8A0D38A-A551-40E4-A05D-2B6049833179}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "transmit-intiface", "transmit-intiface\transmit-intiface.csproj", "{E79976E3-ADA8-4CCE-914A-4F831D352B56}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -84,5 +86,9 @@ Global
 		{A8A0D38A-A551-40E4-A05D-2B6049833179}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A8A0D38A-A551-40E4-A05D-2B6049833179}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A8A0D38A-A551-40E4-A05D-2B6049833179}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E79976E3-ADA8-4CCE-914A-4F831D352B56}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E79976E3-ADA8-4CCE-914A-4F831D352B56}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E79976E3-ADA8-4CCE-914A-4F831D352B56}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E79976E3-ADA8-4CCE-914A-4F831D352B56}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
