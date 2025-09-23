@@ -17,12 +17,12 @@ public class UiActions : IUiActions
 
     public void ConnectSerial(string portName)
     {
-        _routine.Enqueue(() => _routine.TryConnectSerial(portName));
+        _routine.EnqueueAsync(async () => await _routine.TryConnectSerial(portName));
     }
 
     public void DisconnectSerial()
     {
-        _routine.Enqueue(() => _routine.TryDisconnectSerial());
+        _routine.EnqueueAsync(async () => await _routine.TryDisconnectSerial());
     }
 
     public bool IsSerialOpen()

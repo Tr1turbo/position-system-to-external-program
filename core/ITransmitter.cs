@@ -3,9 +3,9 @@
 public interface ITransmitter
 {
     void ProvideNewTarget(RoboticsCoordinates roboticsCoordinates);
-    void Update(float deltaTimeMs);
+    Task Update(float deltaTimeMs);
     
     bool IsOpen();
-    void Open();
-    void Close();
+    Task Open();
+    Task Close();
 }

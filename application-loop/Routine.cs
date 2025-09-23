@@ -40,7 +40,7 @@ public class Routine
     
     //
     
-    private readonly ConcurrentQueue<Action> _queuedForMain = new ConcurrentQueue<Action>();
+    private readonly ConcurrentQueue<Func<Task>> _queuedForMain = new ConcurrentQueue<Func<Task>>();
     private readonly Stopwatch _globalStopwatch;
     
     private bool _exitRequested;
@@ -158,6 +158,15 @@ public class Routine
 
     public void Enqueue(Action action)
     {
+        _queuedForMain.Enqueue(() =>
+        {
+            action();
+            return Task.CompletedTask;
+        });
+    }
+
+    public void EnqueueAsync(Func<Task> action)
+    {
         _queuedForMain.Enqueue(action);
     }
 
@@ -168,11 +177,16 @@ public class Routine
         RefreshExtractionConfiguration();
         RefreshRoboticsConfiguration();
         RefreshWebsocketsConfiguration();
-        
-        while (!_exitRequested)
+
+        var asyncUpdateLoop = Task.Run(async () =>
         {
-            Update();
-        }
+            while (!_exitRequested)
+            {
+                await Update();
+            }
+        });
+        
+        asyncUpdateLoop.Wait();
 
         if (_websocketStarted)
         {
@@ -185,27 +199,27 @@ public class Routine
         return _serial.FetchPortNames();
     }
 
-    public void TryConnectSerial(string portName)
+    public async Task TryConnectSerial(string portName)
     {
         if (_serial.IsOpen()) return;
 
         _serial.PortName = portName;
-        _serial.Open();
+        await _serial.Open();
     }
 
-    public void TryDisconnectSerial()
+    public async Task TryDisconnectSerial()
     {
         if (!_serial.IsOpen()) return;
 
-        _serial.Close();
+        await _serial.Close();
     }
 
-    private void Update()
+    private async Task Update()
     {
         _tickWatch.Restart();
         while (_queuedForMain.TryDequeue(out var action))
         {
-            action.Invoke();
+            await action.Invoke();
         }
         
         if (IsOpenVrRunning)
@@ -293,7 +307,7 @@ public class Routine
             var roboticsCoordinates = _roboticsDriver.UpdateAndGetCoordinates(_lastRoboticsUpdateMs == 0 ? 10L : _globalStopwatch.ElapsedMilliseconds - _lastRoboticsUpdateMs);
             _lastRoboticsUpdateMs = _globalStopwatch.ElapsedMilliseconds;
         
-            Submit(roboticsCoordinates);
+            await Submit(roboticsCoordinates);
         }
         
         // Limit logic to 100 fps, we don't want to extract images too fast
@@ -309,7 +323,7 @@ public class Routine
         return _config.extractorPreference == ExtractorConfig.PrioritizeVR && IsOpenVrRunning;
     }
 
-    private void Submit(RoboticsCoordinates roboticsCoordinates)
+    private async Task Submit(RoboticsCoordinates roboticsCoordinates)
     {
         if (!_transmitter.IsOpen()) return;
         
@@ -326,7 +340,7 @@ public class Routine
         }
 
         var duration = _globalStopwatch.ElapsedMilliseconds - _lastTransmissionUpdate;
-        _transmitter.Update(_lastTransmissionUpdate == 0 ? 10L : duration > 1000 ? 1000 : duration);
+        await _transmitter.Update(_lastTransmissionUpdate == 0 ? 10L : duration > 1000 ? 1000 : duration);
         _lastTransmissionUpdate = _globalStopwatch.ElapsedMilliseconds;
     }
 

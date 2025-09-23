@@ -21,7 +21,7 @@ public class TcodeSerial : ITransmitter
     
     public bool IsOpen() => _port != null && _ready;
 
-    public void Open()
+    public Task Open()
     {
         if (_port != null)
         {
@@ -41,16 +41,20 @@ public class TcodeSerial : ITransmitter
             _port = null;
             _ready = false;
         }
+
+        return Task.CompletedTask;
     }
 
-    public void Close()
+    public Task Close()
     {
-        if (_port == null) return;
+        if (_port == null) return Task.CompletedTask;
         
         _ready = false;
         var port = _port;
         _port = null;
         port.Close();
+
+        return Task.CompletedTask;
     }
     
     public void ProvideNewTarget(RoboticsCoordinates roboticsCoordinates)
@@ -67,13 +71,15 @@ public class TcodeSerial : ITransmitter
         );
     }
 
-    public void Update(float deltaTimeMs)
+    public Task Update(float deltaTimeMs)
     {
         if (_newTargetAcquired)
         {
             _newTargetAcquired = false;
             TrySendCoords(_pos010000, _rot010000);
         }
+
+        return Task.CompletedTask;
     }
     
     /// T-code uses coordinates from 0 to 9999, where 5000 is the middle.<br/>
