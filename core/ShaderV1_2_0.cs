@@ -1,6 +1,6 @@
-﻿namespace Hai.PositionSystemToExternalProgram.Core;
+namespace Hai.PositionSystemToExternalProgram.Core;
 
-public enum ShaderV1_1_0
+public enum ShaderV1_2_0
 {
     Checksum = 0,
     Time = 1,
@@ -41,7 +41,7 @@ public enum ShaderV1_1_0
     Light1Attenuation = 33,
     Light2Attenuation = 34,
     Light3Attenuation = 35,
-    
+
     CameraPositionX = 36,
     CameraPositionY = 37,
     CameraPositionZ = 38,
@@ -49,19 +49,17 @@ public enum ShaderV1_1_0
     CameraEulerAnglesY = 40,
     CameraEulerAnglesZ = 41,
 
-    Reserved42 = 42,
-    Reserved43 = 43,
-    Reserved44 = 44,
-    Reserved45 = 45,
-    Reserved46 = 46,
-    Reserved47 = 47,
-    Reserved48 = 48,
-    Reserved49 = 49,
-    Reserved50 = 50,
-    
+    Sps2Status = 42,
+    Sps2ForwardX = 43,
+    Sps2ForwardY = 44,
+    Sps2ForwardZ = 45,
+    Sps2FrameUpX = 46,
+    Sps2FrameUpY = 47,
+    Sps2FrameUpZ = 48,
+    Sps2SocketFlags = 49,
+    Sps2WorldScale = 50,
+
     Canary = 51,
-    
-    //
-    
+
     NumberOfLines = 52
 }

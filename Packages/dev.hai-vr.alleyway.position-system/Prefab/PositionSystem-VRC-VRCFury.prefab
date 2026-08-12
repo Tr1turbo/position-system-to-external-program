@@ -878,7 +878,7 @@ PrefabInstance:
     - target: {fileID: -1504981713932161579, guid: 8c9584c376f74a139f817df9ebca77b2, type: 3}
       propertyPath: m_Materials.Array.data[0]
       value: 
-      objectReference: {fileID: 2100000, guid: da3676c01698125499094a099e5f5c46, type: 2}
+      objectReference: {fileID: 2100000, guid: 8ad3c01702934591a931927f93f8bac7, type: 2}
     - target: {fileID: -927199367670048503, guid: 8c9584c376f74a139f817df9ebca77b2, type: 3}
       propertyPath: m_Name
       value: PStoEP-Encoder

@@ -17,6 +17,12 @@ public class DecodedData
     public Vector3 CameraPosition;
     public Vector3 CameraRotation;
 
+    public bool Sps2TargetAvailable;
+    public Vector3 Sps2Forward;
+    public Vector3 Sps2FrameUp;
+    public uint Sps2SocketFlags;
+    public float Sps2WorldScale;
+
     public string AsSemverString()
     {
         var major = Version / 1_000_000;

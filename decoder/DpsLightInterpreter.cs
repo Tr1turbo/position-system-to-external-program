@@ -6,6 +6,8 @@ namespace Hai.PositionSystemToExternalProgram.Decoder;
 /// Using light information coming from ExtractedDataDecoder, interpret DPS-like light data.
 public class DpsLightInterpreter
 {
+    private const uint Sps2SocketFlagHole = 1u;
+    private const uint Sps2SocketFlagDoubleSided = 2u;
     private const float LightRangeForHole = 0.41f;
     private const float LightRangeForRing = 0.42f;
     private const float LightRangeForDirectionNormal = 0.45f;
@@ -13,6 +15,26 @@ public class DpsLightInterpreter
     private const float SuspiciousNormalDistanceLimit = 0.3f;
 
     public InterpretedLightData Interpret(DecodedData decoded)
+    {
+        var interpreted = InterpretLegacyLights(decoded);
+        if (!decoded.Sps2TargetAvailable || !interpreted.hasTarget)
+        {
+            return interpreted;
+        }
+
+        var isHole = (decoded.Sps2SocketFlags & Sps2SocketFlagHole) != 0u;
+        interpreted.hasNormal = true;
+        interpreted.normal = decoded.Sps2Forward;
+        interpreted.isHole = isHole;
+        interpreted.isRing = (decoded.Sps2SocketFlags & Sps2SocketFlagDoubleSided) != 0u || !isHole;
+        interpreted.hasTangent = true;
+        interpreted.tangent = decoded.Sps2FrameUp;
+        interpreted.hasSocketWorldScale = true;
+        interpreted.socketWorldScale = decoded.Sps2WorldScale;
+        return interpreted;
+    }
+
+    private static InterpretedLightData InterpretLegacyLights(DecodedData decoded)
     {
         var lights = decoded.Lights.Where(IsBlackLight).ToList();
 

@@ -1,6 +1,6 @@
-// The encoder implementation is shared with the VRCFury SPS2 variant.
+// The encoder implementation is shared with the legacy-light-only variant.
 // Attribution and implementation notes live in PStoEP-EncoderCore.cginc.
-Shader "Hai/PositionSystemToExternalProgram-Encoder"
+Shader "Hai/PositionSystemToExternalProgram-Encoder-VRCFury-SPS2"
 {
     Properties
     {
@@ -19,8 +19,9 @@ Shader "Hai/PositionSystemToExternalProgram-Encoder"
             Cull Off
 
             CGPROGRAM
-            #define PSTOEP_SPS2 0
-            #define PSTOEP_PROTOCOL_VERSION 1001001u
+            #pragma exclude_renderers metal
+            #define PSTOEP_SPS2 1
+            #define PSTOEP_PROTOCOL_VERSION 1002000u
             #include "PStoEP-EncoderCore.cginc"
             ENDCG
         }

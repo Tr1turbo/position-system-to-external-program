@@ -411,6 +411,10 @@ public class UiMainApplication
         ImGui.Text($"Type: {interpretedType}");
         ImGui.Text($"Position: {interpreted.position.X} {interpreted.position.Y} {interpreted.position.Z}");
         ImGui.Text($"Normal: {interpreted.normal.X} {interpreted.normal.Y} {interpreted.normal.Z}");
+        ImGui.Text($"HasTangent: {BoolToString(interpreted.hasTangent)}");
+        ImGui.Text($"Tangent: {interpreted.tangent.X} {interpreted.tangent.Y} {interpreted.tangent.Z}");
+        ImGui.Text($"HasSocketWorldScale: {BoolToString(interpreted.hasSocketWorldScale)}");
+        ImGui.Text($"SocketWorldScale: {interpreted.socketWorldScale}");
     }
 
     private static string BoolToString(bool b)
@@ -447,10 +451,11 @@ public class UiMainApplication
                     ImGui.SameLine();
                 }
             }
-            if (numberOfLines == (int)ShaderV1_1_0.NumberOfLines)
+            if (numberOfLines == (int)ShaderV1_2_0.NumberOfLines)
             {
                 ImGui.SameLine();
-                ImGui.Text("  ->   " + Enum.GetName(typeof(ShaderV1_1_0), (ShaderV1_1_0)row));
+                var layoutType = data.Version >= 1_002_000 ? typeof(ShaderV1_2_0) : typeof(ShaderV1_1_0);
+                ImGui.Text("  ->   " + Enum.GetName(layoutType, row));
             }
         }
         if (!valid) ImGui.PopStyleColor();

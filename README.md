@@ -175,9 +175,45 @@ To do this, we calculate a CRC-32 hash in the shader that this program will chec
 
 If the check fails, we reuse the last known valid data.
 
-The CRC-32 hash is based on groups 1 to 51 (inclusive). The data in 42 to 51 (inclusive) are not currently used.
-However, including them as part of the checksum ensures that it is not a breaking change to add a few additional pieces of
-new data in the shader for future versions.
+The CRC-32 hash is based on groups 1 to 51 (inclusive). Protocol 1.2 uses groups 42 to 50 for the SPS2 target frame:
+
+- 42 is the SPS2 target marker.
+- 43 to 45 contain the selected socket forward axis.
+- 46 to 48 contain the selected socket frame-up axis.
+- 49 contains the SPS2 socket flags.
+- 50 contains the selected socket's scalar world scale.
+
+For SPS2 packets, the standard light fields remain a legacy-compatible target representation. Light 0 is the
+selected socket root and Light 1 is a synthetic front marker positioned so that `normalize(root - front)` reproduces the
+socket forward vector. Lights 2 and 3 are zeroed and disabled so real legacy lights cannot compete with the selected SPS2
+target. The desktop program always runs its ordinary light target-selection algorithm first, then uses a valid SPS2 marker
+to authoritatively augment that same target. At the SPS2 boundary these axes are forward and frame-up; the application
+maps them to its established normal and tangent fields.
+
+The VRCFury prefab uses a separate static Position System shader which includes the modular SPS2 atlas readers from the
+officially installed VRCFury package. It reads `_VFGridFinal`, uses the SPS cell dictionary to enumerate occupied groups,
+validates socket cells, and selects the socket nearest to the encoder origin. The atlas scan runs in the vertex stage so
+the fragment-stage packet and CRC serialization do not repeat it for every bit.
+The selection is recomputed for every encoder draw and has no persistent target identity, so when two sockets exchange
+distance order the observer switches to the newly nearest valid socket.
+
+The SPS2 integration requires VRCFury to be installed in the Unity project, but it does not require any VRCFury
+components to be used on the avatar. If VRCFury is not installed, the dedicated VRCFury SPS2 shader will fail to
+compile. The ordinary non-SPS2 encoder shader used by the Modular Avatar and ChilloutVR prefabs does not compile any
+VRCFury code and remains available.
+
+The shader references VRCFury's installed `sps_cell_layout.cginc` module, which transitively provides the texture and
+codec helpers it needs, without copying or modifying them. This makes that include path a compile-time dependency for the
+VRCFury prefab. If no validated SPS2 socket is visible, the VRCFury shader exports Unity's four vertex lights unchanged.
+Radius-offset is exported as a socket flag; the raw socket position is retained because a read-only observer has no plug
+radius with which to apply it.
+Socket world scale is accepted only when it is finite, positive, and between `1e-6` and `1e6`. If it is invalid, the
+shader keeps the valid synthetic root/front lights but clears words 42 to 50, so the desktop safely uses ordinary legacy
+light interpretation for that frame.
+These include paths and helper names are internal to VRCFury 1.1417.0 rather than a documented stable integration API.
+
+VRCFury 1.1417.0 explicitly excludes its SPS2 socket-marker and resolver shaders from Unity's Metal renderer. The Position
+System SPS2 observer likewise excludes Metal and targets the Windows Direct3D rendering path only.
 
 ### WebSockets as an alternative input system
 

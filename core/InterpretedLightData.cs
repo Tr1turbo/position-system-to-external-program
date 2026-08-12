@@ -14,4 +14,6 @@ public struct InterpretedLightData
     
     public bool hasTangent;
     public Vector3 tangent;
+    public bool hasSocketWorldScale;
+    public float socketWorldScale;
 }
