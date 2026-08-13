@@ -105,7 +105,7 @@ public class TcodeSerial : ITransmitter
             RemapTarget(roboticsCoordinates.JoystickTargetL1),
             RemapTarget(roboticsCoordinates.JoystickTargetL2));
         _rot010000 = new Vector3(
-            RemapTarget(roboticsCoordinates.AngleDegR0 / 35f),
+            RemapTarget(roboticsCoordinates.AngleDegR0 / 135f),
             RemapTarget(roboticsCoordinates.AngleDegR1 / 35f),
             RemapTarget(roboticsCoordinates.AngleDegR2 / 35f)
         );

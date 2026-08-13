@@ -355,7 +355,7 @@ public class Routine
                     RawSerialData.L0 = RemapTarget(roboticsCoordinates.JoystickTargetL0);
                     RawSerialData.L1 = RemapTarget(roboticsCoordinates.JoystickTargetL1);
                     RawSerialData.L2 = RemapTarget(roboticsCoordinates.JoystickTargetL2);
-                    RawSerialData.R0 = RemapTarget(roboticsCoordinates.AngleDegR0 / 35f);
+                    RawSerialData.R0 = RemapTarget(roboticsCoordinates.AngleDegR0 / 135f);
                     RawSerialData.R1 = RemapTarget(roboticsCoordinates.AngleDegR1 / 35f);
                     RawSerialData.R2 = RemapTarget(roboticsCoordinates.AngleDegR2 / 35f);
         
