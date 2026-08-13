@@ -22,7 +22,11 @@ public class TcodeSerial : ITransmitter
 
     public Dictionary<string, string> FetchDetailedPortNames()
     {
-        var portNames = new Dictionary<string, string>();
+        var portNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var portName in SerialPort.GetPortNames())
+        {
+            portNames[portName] = portName;
+        }
         
         try
         {
@@ -36,7 +40,7 @@ public class TcodeSerial : ITransmitter
                 var description = queryObj["Description"]?.ToString();
                 var name = queryObj["Name"]?.ToString();
                     
-                if (!string.IsNullOrEmpty(portName))
+                if (!string.IsNullOrEmpty(portName) && portNames.ContainsKey(portName))
                 {
                     var friendlyName = !string.IsNullOrEmpty(description) ? $"{description} ({portName})"
                         : !string.IsNullOrEmpty(name) ? $"{name} ({portName})"
@@ -46,14 +50,13 @@ public class TcodeSerial : ITransmitter
                 }
             }
 
-            return portNames;
         }
         catch (Exception)
         {
             // ignored
         }
 
-        return SerialPort.GetPortNames().ToDictionary(s => s, s => s);
+        return portNames;
     }
     
     public bool IsOpen() => _port != null && _ready;
