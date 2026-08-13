@@ -83,7 +83,6 @@ bool isMirror()
 static const uint VENDOR = 1366692562u;
 static const uint VERSION = PSTOEP_PROTOCOL_VERSION;
 static const uint CANARY = 1431677610u;
-static const int GROUP_32 = 32;
 static const int GROUP_Time = 1;
 static const int GROUP_VendorCheck = 2;
 static const int GROUP_VersionSemver = 3;
@@ -97,6 +96,9 @@ static const int GROUP_Canary = 51;
 static const int GROUP_LENGTH = 52;
 
 static const int SERIALIZE_NumberOfColumns = 16;
+static const uint SERIALIZE_BitsPerWord = 32u;
+static const uint SERIALIZE_WordShift = 5u; // 32 = 2^5
+static const uint SERIALIZE_BitIndexMask = SERIALIZE_BitsPerWord - 1u;
 static const int MARGIN = 1;
 static const float GrayLevel = 0.5;
 static const uint CRC32_POLYNOMIAL = 0xEDB88320u;
@@ -124,9 +126,9 @@ float3 GetUnityEulerAngles(float3x3 rotMatrix)
     return euler;
 }
 
-uint NthBit(uint value, int bit)
+uint NthBit(uint value, uint bit)
 {
-    return value & (uint)(1 << bit);
+    return value & (1u << bit);
 }
 
 uint getData(int wordIndex, PSTOEP_PROVIDER_CONTEXT_TYPE providerContext)
@@ -138,17 +140,21 @@ uint getData(int wordIndex, PSTOEP_PROVIDER_CONTEXT_TYPE providerContext)
     if (wordIndex < GROUP_LightPositionStart) return VERSION;
     if (wordIndex < GROUP_LightColorStart)
     {
-        int lightWordOffset = wordIndex - GROUP_LightPositionStart;
-        int lightIndex = (int)floor(lightWordOffset / 3.0);
-        int componentIndex = (int)glsl_mod(lightWordOffset, 3);
-        float3 position = PSTOEP_PROVIDER_LIGHT_POSITION(lightIndex, providerContext);
+        // lightWordOffset is an integer in [0, 11].
+        uint lightWordOffset = (uint)(wordIndex - GROUP_LightPositionStart);
+        uint lightIndex = lightWordOffset / 3u; // floor(lightWordOffset / 3.0)
+        uint componentIndex = lightWordOffset - lightIndex * 3u; // glsl_mod(lightWordOffset, 3)
+        float3 position = PSTOEP_PROVIDER_LIGHT_POSITION((int)lightIndex, providerContext);
         return asuint(position[componentIndex]);
     }
     if (wordIndex < GROUP_LightAttenuationStart)
     {
-        int lightIndex = (int)floor((wordIndex - GROUP_LightColorStart) / 4.0);
-        float4 color = PSTOEP_PROVIDER_LIGHT_COLOR(lightIndex, providerContext);
-        return asuint(color[(int)glsl_mod(wordIndex - GROUP_LightColorStart, 4)]);
+        uint colorWordOffset = (uint)(wordIndex - GROUP_LightColorStart);
+        // colorWordOffset is an integer in [0, 15].
+        uint lightIndex = colorWordOffset >> 2u; // floor(colorWordOffset / 4.0)
+        uint componentIndex = colorWordOffset & 3u; // glsl_mod(colorWordOffset, 4)
+        float4 color = PSTOEP_PROVIDER_LIGHT_COLOR((int)lightIndex, providerContext);
+        return asuint(color[componentIndex]);
     }
     if (wordIndex < GROUP_CameraPositionStart)
     {
@@ -213,7 +219,9 @@ v2f vert(appdata input)
     #endif
 
     float makeBigger = _IsTestScript > 0.5 ? 10 : 1;
-    float lineCount = ceil((GROUP_LENGTH * 32.0) / SERIALIZE_NumberOfColumns);
+    float lineCount = ceil(
+        (GROUP_LENGTH * (float)SERIALIZE_BitsPerWord) / SERIALIZE_NumberOfColumns
+    );
     float relativeX = makeBigger * (SERIALIZE_NumberOfColumns + MARGIN * 2)
         * _EncodedSquareSize / _ScreenParams.x * relativeY2;
     float relativeY = makeBigger * (lineCount + MARGIN * 2)
@@ -245,7 +253,9 @@ fixed4 frag(v2f input) : SV_Target
     #endif
     if (isMirror()) clip(-1);
 
-    float lineCount = ceil((GROUP_LENGTH * 32.0) / SERIALIZE_NumberOfColumns);
+    float lineCount = ceil(
+        (GROUP_LENGTH * (float)SERIALIZE_BitsPerWord) / SERIALIZE_NumberOfColumns
+    );
     // Black margins prevent neighboring scene pixels from contaminating samples.
     // Packet pixels deliberately use GrayLevel instead of full white to limit bloom.
     // The decoder also expects brightness to vary because transparency or other
@@ -258,10 +268,12 @@ fixed4 frag(v2f input) : SV_Target
     }
 
     float2 serialized = floor(input.uv);
-    int bitOffset = (int)floor(serialized.y * SERIALIZE_NumberOfColumns + serialized.x);
-    float2 group = floor(float2(glsl_mod(bitOffset, GROUP_32), bitOffset / GROUP_32));
+    uint bitOffset = (uint)floor(serialized.y * SERIALIZE_NumberOfColumns + serialized.x);
+    // bitOffset is an integer in [0, GROUP_LENGTH * SERIALIZE_BitsPerWord - 1].
+    uint bitIndex = bitOffset & SERIALIZE_BitIndexMask; // glsl_mod(bitOffset, 32)
+    uint wordIndex = bitOffset >> SERIALIZE_WordShift; // floor(bitOffset / 32.0)
     uint data;
-    if (group.y < GROUP_Time)
+    if (wordIndex < (uint)GROUP_Time)
     {
         // Word 0 is the CRC of words 1 through 51. getData cannot recursively
         // produce its own checksum, so the checksum word is handled here.
@@ -274,10 +286,10 @@ fixed4 frag(v2f input) : SV_Target
     }
     else
     {
-        data = getData((int)group.y, providerContext);
+        data = getData((int)wordIndex, providerContext);
     }
 
-    return NthBit(data, (int)group.x) != 0u
+    return NthBit(data, bitIndex) != 0u
         ? half4(GrayLevel, GrayLevel, GrayLevel, 1)
         : half4(-10000, -10000, -10000, 1);
 }
