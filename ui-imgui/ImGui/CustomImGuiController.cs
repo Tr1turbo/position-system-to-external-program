@@ -102,18 +102,17 @@ namespace ImGuiNET
             //     io.Fonts.AddFontFromFileTTF(HAssets.KiwiMaruJaFont.Absolute(), sizePixels, configMerge, io.Fonts.GetGlyphRangesJapanese());
             // }
 
-#if WIP_SUPPORTS_TRADITIONAL_CHINESE
             unsafe
             {
-                //
-                var sizePixels = 24f;
+                const float sizePixels = 16f;
                 ImFontConfigPtr configMerge = ImGuiNative.ImFontConfig_ImFontConfig();
                 configMerge.OversampleH = 2;
                 configMerge.OversampleV = 2;
                 configMerge.MergeMode = true;
+                configMerge.PixelSnapH = true;
+                configMerge.RasterizerMultiply = 2.6f;
                 io.Fonts.AddFontFromFileTTF(PAssets.TraditionalChineseFont.Absolute(), sizePixels, configMerge, io.Fonts.GetGlyphRangesChineseFull());
             }
-#endif
         }
 
         public void WindowResized(int width, int height)
