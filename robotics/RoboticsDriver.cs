@@ -8,6 +8,10 @@ public class RoboticsDriver
 {
     // FIXME: Temporarily disabled PidRoot because the PID controller is unstable.
     private const bool TEMP_CanUsePidRoot = false;
+
+    private const float MinimumTwistAngleDegrees = -135f;
+    private const float MaximumTwistAngleDegrees = 135f;
+    private const float MinimumUsableDirectionLengthSquared = 0.000001f;
     
     private float _configVirtualScale = 1f;
     
@@ -42,6 +46,11 @@ public class RoboticsDriver
     private float _unsafeAngleDegR1 = 0; 
     private float _unsafeAngleDegR2 = 0;
     private float _unsafeVerticality;
+
+    private bool _boundedTwistInitialized;
+    private Vector3 _previousTwistNormal;
+    private Vector3 _previousTwistFrameUp;
+    private float _boundedTwistCommandDegrees;
     
     private Vector3 _transitionalCoordinate;
     private readonly PidControllerVector3 _postTransitionalPid;
@@ -97,6 +106,7 @@ public class RoboticsDriver
         {
             // TODO: If there is no target, we need to remember that, so that when a target appears,
             // we don't immediately slam the robotic arm because the data has changed too much.
+            ResetBoundedTwistObservation();
             return;
         }
 
@@ -113,12 +123,18 @@ public class RoboticsDriver
                 -interpretedData.normal.Z,
                 interpretedData.normal.X
             );
+            var reorientedTangent = new Vector3(
+                interpretedData.tangent.Y,
+                -interpretedData.tangent.Z,
+                interpretedData.tangent.X
+            );
             
             // Rotate the entire system
             if (_configRotateSystemAngleDegPitch != 0)
             {
                 reorientedPosition = Vector3.Transform(reorientedPosition, _precalculatedPitcher);
                 reorientedNormal = Vector3.Transform(reorientedNormal, _precalculatedPitcher);
+                reorientedTangent = Vector3.Transform(reorientedTangent, _precalculatedPitcher);
             }
 
             reorientedPosition /= _precalculatedEffectiveVirtualScale;
@@ -161,9 +177,7 @@ public class RoboticsDriver
                     // Perform a normal to degree conversion. This limits the range from -90 to +90.
                     if (interpretedData.hasTangent)
                     {
-                        // TODO: When we have a tangent, we should be able to calculate some twist. However, what's considered 0 degrees?
-                        // Maybe we need to use a PID controller to track the twist.
-                        _unsafeAngleDegR0 = 0;
+                        _unsafeAngleDegR0 = UpdateBoundedTwist(reorientedNormal, reorientedTangent);
                     }
                     else
                     {
@@ -172,16 +186,31 @@ public class RoboticsDriver
                         {
                             var L2_Lateral = Clamp(unclampedVector.Z, -1f, 1f);
                             var R1_Roll = NormalToDegrees(-reorientedNormal.Z);
-                            _unsafeAngleDegR0 = Clamp(_configTwistFromLateral * L2_Lateral * 135f + _configTwistFromRoll * R1_Roll, -135f, 135f);
+                            _unsafeAngleDegR0 = Clamp(
+                                _configTwistFromLateral * L2_Lateral * MaximumTwistAngleDegrees + _configTwistFromRoll * R1_Roll,
+                                MinimumTwistAngleDegrees,
+                                MaximumTwistAngleDegrees
+                            );
                         }
                         else
                         {
                             _unsafeAngleDegR0 = 0;
                         }
+                        ResetBoundedTwistObservation(_unsafeAngleDegR0);
                     }
                     _unsafeAngleDegR1 = NormalToDegrees(-reorientedNormal.Z);
                     _unsafeAngleDegR2 = NormalToDegrees(reorientedNormal.Y);
                 }
+                else
+                {
+                    ResetBoundedTwistObservation();
+                }
+            }
+            else
+            {
+                // Do not compare a future valid frame against an observation from before
+                // the target left the permitted workspace.
+                ResetBoundedTwistObservation();
             }
         }
 
@@ -208,6 +237,127 @@ public class RoboticsDriver
         if (!_configUsePidTarget)
         {
             CalculateOutputs(_transitionalCoordinate);
+        }
+    }
+
+    private float UpdateBoundedTwist(Vector3 normalUntrusted, Vector3 frameUpUntrusted)
+    {
+        if (!TryCreateTwistFrame(normalUntrusted, frameUpUntrusted, out var normal, out var frameUp))
+        {
+            ResetBoundedTwistObservation();
+            return _boundedTwistCommandDegrees;
+        }
+
+        if (!_boundedTwistInitialized)
+        {
+            _previousTwistNormal = normal;
+            _previousTwistFrameUp = frameUp;
+            _boundedTwistInitialized = true;
+            return _boundedTwistCommandDegrees;
+        }
+
+        if (!TryTransportFrameUp(_previousTwistNormal, _previousTwistFrameUp, normal, out var transportedPreviousFrameUp))
+        {
+            _previousTwistNormal = normal;
+            _previousTwistFrameUp = frameUp;
+            return _boundedTwistCommandDegrees;
+        }
+
+        var sine = Vector3.Dot(Vector3.Cross(transportedPreviousFrameUp, frameUp), normal);
+        var cosine = Clamp(Vector3.Dot(transportedPreviousFrameUp, frameUp), -1f, 1f);
+        var deltaDegrees = MathF.Atan2(sine, cosine) * 180f / MathF.PI;
+
+        // Always advance the observation, even at a mechanical limit. Any outward
+        // movement that the machine cannot perform is discarded instead of stored as windup.
+        _previousTwistNormal = normal;
+        _previousTwistFrameUp = frameUp;
+        _boundedTwistCommandDegrees = Clamp(
+            _boundedTwistCommandDegrees + deltaDegrees,
+            MinimumTwistAngleDegrees,
+            MaximumTwistAngleDegrees
+        );
+        return _boundedTwistCommandDegrees;
+    }
+
+    private static bool TryCreateTwistFrame(
+        Vector3 normalUntrusted,
+        Vector3 frameUpUntrusted,
+        out Vector3 normal,
+        out Vector3 frameUp)
+    {
+        normal = Vector3.Zero;
+        frameUp = Vector3.Zero;
+        if (!IsUsableDirection(normalUntrusted) || !IsUsableDirection(frameUpUntrusted))
+        {
+            return false;
+        }
+
+        normal = Vector3.Normalize(normalUntrusted);
+        var frameUpProjected = frameUpUntrusted - normal * Vector3.Dot(frameUpUntrusted, normal);
+        if (!IsUsableDirection(frameUpProjected))
+        {
+            return false;
+        }
+
+        frameUp = Vector3.Normalize(frameUpProjected);
+        return true;
+    }
+
+    private static bool TryTransportFrameUp(
+        Vector3 previousNormal,
+        Vector3 previousFrameUp,
+        Vector3 currentNormal,
+        out Vector3 transportedFrameUp)
+    {
+        transportedFrameUp = Vector3.Zero;
+        var normalDot = Clamp(Vector3.Dot(previousNormal, currentNormal), -1f, 1f);
+        if (normalDot < -0.9999f)
+        {
+            // Parallel transport is ambiguous for an exact 180-degree normal change.
+            // Re-baseline this sample rather than issuing an arbitrary half-turn.
+            return false;
+        }
+
+        Quaternion transport;
+        if (normalDot > 0.9999f)
+        {
+            transport = Quaternion.Identity;
+        }
+        else
+        {
+            var cross = Vector3.Cross(previousNormal, currentNormal);
+            transport = Quaternion.Normalize(new Quaternion(cross, 1f + normalDot));
+        }
+
+        var transported = Vector3.Transform(previousFrameUp, transport);
+        transported -= currentNormal * Vector3.Dot(transported, currentNormal);
+        if (!IsUsableDirection(transported))
+        {
+            return false;
+        }
+
+        transportedFrameUp = Vector3.Normalize(transported);
+        return true;
+    }
+
+    private static bool IsUsableDirection(Vector3 direction)
+    {
+        return float.IsFinite(direction.X)
+            && float.IsFinite(direction.Y)
+            && float.IsFinite(direction.Z)
+            && direction.LengthSquared() > MinimumUsableDirectionLengthSquared;
+    }
+
+    private void ResetBoundedTwistObservation(float? commandDegrees = null)
+    {
+        _boundedTwistInitialized = false;
+        if (commandDegrees.HasValue)
+        {
+            _boundedTwistCommandDegrees = Clamp(
+                commandDegrees.Value,
+                MinimumTwistAngleDegrees,
+                MaximumTwistAngleDegrees
+            );
         }
     }
 
@@ -251,6 +401,7 @@ public class RoboticsDriver
     {
         // Placeholder; then there may be a procedure to ensure that when data is recovered,
         // we don't immediately slam the robotic arm because the data has changed too much.
+        ResetBoundedTwistObservation();
     }
 
     public RoboticsCoordinates UpdateAndGetCoordinates(long deltaTimeMs)
@@ -362,6 +513,7 @@ public class RoboticsDriver
 
         _configTwistFromRoll = config.UseSimulatedTwistFromRoll ? config.SimulatedTwistFromRoll : 0f;
         _configTwistFromLateral = config.UseSimulatedTwistFromLateral ? config.SimulatedTwistFromLateral : 0f;
+        ResetBoundedTwistObservation();
     }
     
     public struct RoboticsConfiguration
