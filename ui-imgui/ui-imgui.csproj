@@ -37,6 +37,7 @@
     <ItemGroup>
       <None Update="PAssets\fonts\NotoSansTC-VariableFont_wght.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       </None>
       <None Update="pstoep_localization.en.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>

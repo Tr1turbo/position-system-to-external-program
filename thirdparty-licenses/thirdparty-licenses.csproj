@@ -17,13 +17,13 @@
       <None Update="ThirdParty\THIRDPARTY-LICENSES\IMGUINETSAMPLEPROGRAM-ERICMELLINO-MIT.md">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="ThirdParty\THIRDPARTY-LICENSES\NOTOSANS-SILOFL.md">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
       <None Update="ThirdParty\THIRDPARTY-LICENSES\OPENVR-VALVE-BSD3.md">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="ThirdParty\THIRDPARTY-LICENSES\OPENVRSCREENGRAB-CNLOHR-MIT.md">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="ThirdParty\THIRDPARTY-LICENSES\ROBOTO-SILOFL.md">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="ThirdParty\THIRDPARTY-LICENSES\VELDRID-ERICMELLINO-MIT.md">
