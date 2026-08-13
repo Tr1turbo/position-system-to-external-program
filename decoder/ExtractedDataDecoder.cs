@@ -23,14 +23,13 @@ public class ExtractedDataDecoder
     private const int LightAttenuationStart = LightColorStart + 4 * NumberOfComponentsInAColor;
     private const int CameraPositionStart = 36;
     private const int CameraRotationStart = 39;
-    private const int Sps2Status = 42;
+    private const int Sps2SocketIdentity = 42;
     private const int Sps2ForwardStart = 43;
     private const int Sps2FrameUpStart = 46;
     private const int Sps2SocketFlags = 49;
     private const int Sps2WorldScale = 50;
     public const int GroupLength = 52;
 
-    private const uint Sps2TargetCanary = 0x53505332u;
     private const float MinimumReasonableSps2Scale = 1.0e-6f;
     private const float MaximumReasonableSps2Scale = 1.0e6f;
     
@@ -101,13 +100,15 @@ public class ExtractedDataDecoder
         }
 
         decodedMutated.Sps2TargetAvailable = false;
+        decodedMutated.Sps2SocketIdentity = 0u;
         decodedMutated.Sps2Forward = Vector3.Zero;
         decodedMutated.Sps2FrameUp = Vector3.Zero;
         decodedMutated.Sps2SocketFlags = 0u;
         decodedMutated.Sps2WorldScale = 0f;
+        var sps2SocketIdentity = SampleUInt32(Sps2SocketIdentity);
         var sps2WorldScale = SampleFloat(Sps2WorldScale);
         if (versionSemverValue >= 1_002_000
-            && SampleUInt32(Sps2Status) == Sps2TargetCanary
+            && sps2SocketIdentity != 0u
             && ReadVector3StartingFromLine(Sps2ForwardStart, out var sps2Forward)
             && ReadVector3StartingFromLine(Sps2FrameUpStart, out var sps2FrameUp)
             && IsUsableDirection(sps2Forward)
@@ -120,6 +121,7 @@ public class ExtractedDataDecoder
             if (IsUsableDirection(frameUpPerpendicular))
             {
                 decodedMutated.Sps2TargetAvailable = true;
+                decodedMutated.Sps2SocketIdentity = sps2SocketIdentity;
                 decodedMutated.Sps2Forward = normalizedForward;
                 decodedMutated.Sps2FrameUp = Vector3.Normalize(frameUpPerpendicular);
                 decodedMutated.Sps2SocketFlags = SampleUInt32(Sps2SocketFlags);

@@ -34,6 +34,7 @@ struct v2f
     nointerpolation float4 sps2WorldPositionValid : TEXCOORD1;
     nointerpolation float4 sps2WorldForwardFlags : TEXCOORD2;
     nointerpolation float4 sps2WorldFrameUp : TEXCOORD3;
+    nointerpolation uint sps2SocketIdentity : TEXCOORD4;
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -44,6 +45,7 @@ struct PStoEPSps2Target
     float3 worldForward;
     float3 worldFrameUp;
     float worldScale;
+    uint socketIdentity;
     uint socketFlags;
     bool sps2FrameValid;
     bool valid;
@@ -103,8 +105,6 @@ bool isMirror()
 static const uint VENDOR = 1366692562u;
 static const uint VERSION = PSTOEP_PROTOCOL_VERSION;
 static const uint CANARY = 1431677610u;
-static const uint SPS2_TARGET_CANARY = 0x53505332u;
-
 static const int GROUP_32 = 32;
 static const int GROUP_Time = 1;
 static const int GROUP_VendorCheck = 2;
@@ -114,7 +114,7 @@ static const int GROUP_LightColorStart = 16;
 static const int GROUP_LightAttenuationStart = 32;
 static const int GROUP_CameraPositionStart = 36;
 static const int GROUP_CameraRotationStart = 39;
-static const int GROUP_Sps2Status = 42;
+static const int GROUP_Sps2SocketIdentity = 42;
 static const int GROUP_Sps2ForwardStart = 43;
 static const int GROUP_Sps2FrameUpStart = 46;
 static const int GROUP_Sps2SocketFlags = 49;
@@ -141,6 +141,19 @@ bool PStoEP_IsFiniteVector(float3 value)
 bool PStoEP_IsReasonableScale(float value)
 {
     return value == value && value >= 1.0e-6 && value <= 1.0e6;
+}
+
+uint PStoEP_SocketIdentity(uint playerId, uint uniqueId)
+{
+    // Produce one opaque protocol identifier from SPS2's two-part identity.
+    // Zero remains reserved for "no selected SPS2 socket".
+    uint identity = playerId ^ (uniqueId + 0x9e3779b9u + (playerId << 6u) + (playerId >> 2u));
+    identity ^= identity >> 16u;
+    identity *= 0x7feb352du;
+    identity ^= identity >> 15u;
+    identity *= 0x846ca68bu;
+    identity ^= identity >> 16u;
+    return identity != 0u ? identity : 1u;
 }
 
 PStoEPSps2Target PStoEP_EmptySps2Target()
@@ -213,6 +226,10 @@ PStoEPSps2Target PStoEP_FindNearestSps2Socket()
             best.worldForward = worldForward;
             best.worldFrameUp = worldFrameUp;
             best.worldScale = PStoEP_IsReasonableScale(worldScale) ? worldScale : 0;
+            best.socketIdentity = PStoEP_SocketIdentity(
+                sps_cell_header_player_id(cell),
+                sps_cell_header_unique_id(cell)
+            );
             best.socketFlags = cell.read_uint(
                 sps_cell_pixel_index_from_payload_index(SPS_SOCKET_PAYLOAD_FLAGS)
             );
@@ -237,6 +254,7 @@ void PStoEP_WriteSps2Varyings(PStoEPSps2Target target, inout v2f output)
     output.sps2WorldPositionValid = float4(target.worldPosition, target.valid ? 1.0 : 0.0);
     output.sps2WorldForwardFlags = float4(target.worldForward, (float)target.socketFlags);
     output.sps2WorldFrameUp = float4(target.worldFrameUp, target.sps2FrameValid ? target.worldScale : 0);
+    output.sps2SocketIdentity = target.socketIdentity;
 }
 
 PStoEPSps2Target PStoEP_ReadSps2Varyings(v2f input)
@@ -246,6 +264,7 @@ PStoEPSps2Target PStoEP_ReadSps2Varyings(v2f input)
     target.worldForward = input.sps2WorldForwardFlags.xyz;
     target.worldFrameUp = input.sps2WorldFrameUp.xyz;
     target.worldScale = input.sps2WorldFrameUp.w;
+    target.socketIdentity = input.sps2SocketIdentity;
     target.socketFlags = (uint)round(input.sps2WorldForwardFlags.w);
     target.valid = input.sps2WorldPositionValid.w > 0.5;
     target.sps2FrameValid = target.valid && PStoEP_IsReasonableScale(target.worldScale);
@@ -271,6 +290,12 @@ float3 PStoEP_UnityLightWorldPosition(uint index)
 
 float3 GetEncodedLightPosition(uint index, PStoEPSps2Target target)
 {
+#if PSTOEP_SPS2
+    // The SPS2 encoder reserves only slots 0 and 1 for its compatibility
+    // root/front pair. Slots 2 and 3 are always deterministic disabled zeros.
+    if (index >= 2u) return 0;
+#endif
+
     float3 worldPosition = PStoEP_UnityLightWorldPosition(index);
     if (target.valid)
     {
@@ -281,17 +306,20 @@ float3 GetEncodedLightPosition(uint index, PStoEPSps2Target target)
             // front marker is placed opposite the SPS socket's forward vector.
             worldPosition = target.worldPosition - target.worldForward * SPS2_LEGACY_FRONT_DISTANCE;
         }
-        else if (index >= 2u) worldPosition = 0;
     }
     return mul(unity_WorldToObject, float4(worldPosition, 1)).xyz;
 }
 
 float4 GetEncodedLightColor(uint index, PStoEPSps2Target target)
 {
+#if PSTOEP_SPS2
+    if (index >= 2u) return 0;
+#endif
+
     float4 color = unity_LightColor[index];
     if (!target.valid) return color;
     if (index < 2u) return float4(0, 0, 0, 1);
-    return float4(0, 0, 0, 0);
+    return 0;
 }
 
 float UnityAttenuationFromRange(float range)
@@ -301,6 +329,10 @@ float UnityAttenuationFromRange(float range)
 
 float GetEncodedLightAttenuation(uint index, PStoEPSps2Target target)
 {
+#if PSTOEP_SPS2
+    if (index >= 2u) return 0;
+#endif
+
     float attenuation = unity_4LightAtten0[index];
     if (!target.valid) return attenuation;
     if (index == 0u)
@@ -309,7 +341,7 @@ float GetEncodedLightAttenuation(uint index, PStoEPSps2Target target)
         return UnityAttenuationFromRange(isHole ? SPS2_LEGACY_RANGE_HOLE : SPS2_LEGACY_RANGE_RING);
     }
     if (index == 1u) return UnityAttenuationFromRange(SPS2_LEGACY_RANGE_FRONT);
-    return UnityAttenuationFromRange(1.0);
+    return attenuation;
 }
 
 float3 GetUnityEulerAngles(float3x3 rotMatrix)
@@ -367,14 +399,14 @@ uint getData(float groupY, PStoEPSps2Target target)
     {
         return asuint(_WorldSpaceCameraPos[(uint)(groupY - GROUP_CameraPositionStart)]);
     }
-    if (groupY < GROUP_Sps2Status)
+    if (groupY < GROUP_Sps2SocketIdentity)
     {
         float3 euler = GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
         return asuint(euler[(uint)(groupY - GROUP_CameraRotationStart)]);
     }
     if (groupY < GROUP_Sps2ForwardStart)
     {
-        return target.sps2FrameValid ? SPS2_TARGET_CANARY : 0u;
+        return target.sps2FrameValid ? target.socketIdentity : 0u;
     }
     if (groupY < GROUP_Sps2FrameUpStart)
     {

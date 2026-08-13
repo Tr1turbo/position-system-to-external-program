@@ -49,7 +49,7 @@ public enum ShaderV1_2_0
     CameraEulerAnglesY = 40,
     CameraEulerAnglesZ = 41,
 
-    Sps2Status = 42,
+    Sps2SocketIdentity = 42,
     Sps2ForwardX = 43,
     Sps2ForwardY = 44,
     Sps2ForwardZ = 45,

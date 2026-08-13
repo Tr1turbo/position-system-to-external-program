@@ -18,6 +18,7 @@ public class DecodedData
     public Vector3 CameraRotation;
 
     public bool Sps2TargetAvailable;
+    public uint Sps2SocketIdentity;
     public Vector3 Sps2Forward;
     public Vector3 Sps2FrameUp;
     public uint Sps2SocketFlags;

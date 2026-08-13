@@ -29,6 +29,8 @@ public class DpsLightInterpreter
         interpreted.isRing = (decoded.Sps2SocketFlags & Sps2SocketFlagDoubleSided) != 0u || !isHole;
         interpreted.hasTangent = true;
         interpreted.tangent = decoded.Sps2FrameUp;
+        interpreted.hasSocketIdentity = true;
+        interpreted.socketIdentity = decoded.Sps2SocketIdentity;
         interpreted.hasSocketWorldScale = true;
         interpreted.socketWorldScale = decoded.Sps2WorldScale;
         return interpreted;

@@ -151,15 +151,15 @@ This is why there is reserved space for future use.
 | **39** | Euler angles of the camera (x) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
 | **40** | Euler angles of the camera (y) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
 | **41** | Euler angles of the camera (y) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
-| **42** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
-| **43** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
-| **44** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
-| **45** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
-| **46** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
-| **47** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
-| **48** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
-| **49** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
-| **50** | Unused, reserved for future non-breaking use. This is part of the checksum.                                                                                                                                                                              |          |
+| **42** | Nonzero opaque identifier for the selected SPS2 socket, derived from its player ID and unique ID. Zero means no validated SPS2 socket frame is available.                                                                                                | \>=1.2.0 |
+| **43** | Selected SPS2 socket forward axis (x) in encoder-local space.                                                                                                                                                                                             | \>=1.2.0 |
+| **44** | Selected SPS2 socket forward axis (y) in encoder-local space.                                                                                                                                                                                             | \>=1.2.0 |
+| **45** | Selected SPS2 socket forward axis (z) in encoder-local space.                                                                                                                                                                                             | \>=1.2.0 |
+| **46** | Selected SPS2 socket frame-up axis (x) in encoder-local space.                                                                                                                                                                                            | \>=1.2.0 |
+| **47** | Selected SPS2 socket frame-up axis (y) in encoder-local space.                                                                                                                                                                                            | \>=1.2.0 |
+| **48** | Selected SPS2 socket frame-up axis (z) in encoder-local space.                                                                                                                                                                                            | \>=1.2.0 |
+| **49** | Selected SPS2 socket flags.                                                                                                                                                                                                                               | \>=1.2.0 |
+| **50** | Selected SPS2 socket scalar world scale.                                                                                                                                                                                                                  | \>=1.2.0 |
 | **51** | Canary. Equal to 1431677610, which results in a checkerboard pattern in binary. This is used to help solve alignment issues.<br/>This value can change in the future. The program will not check if this value is equal, but it is part of the checksum. |          |
 
 \* *The value of `unity_LightColor[3]` may be disrupted if the scene contains a directional light due to a Unity quirk, so this value may not be trusted to detect point lights.*
@@ -177,7 +177,7 @@ If the check fails, we reuse the last known valid data.
 
 The CRC-32 hash is based on groups 1 to 51 (inclusive). Protocol 1.2 uses groups 42 to 50 for the SPS2 target frame:
 
-- 42 is the SPS2 target marker.
+- 42 is a nonzero opaque identifier for the selected socket, derived from the SPS2 player ID and socket unique ID. Zero means that no validated SPS2 socket frame is available.
 - 43 to 45 contain the selected socket forward axis.
 - 46 to 48 contain the selected socket frame-up axis.
 - 49 contains the SPS2 socket flags.
@@ -186,9 +186,14 @@ The CRC-32 hash is based on groups 1 to 51 (inclusive). Protocol 1.2 uses groups
 For SPS2 packets, the standard light fields remain a legacy-compatible target representation. Light 0 is the
 selected socket root and Light 1 is a synthetic front marker positioned so that `normalize(root - front)` reproduces the
 socket forward vector. Lights 2 and 3 are zeroed and disabled so real legacy lights cannot compete with the selected SPS2
-target. The desktop program always runs its ordinary light target-selection algorithm first, then uses a valid SPS2 marker
+target. The desktop program always runs its ordinary light target-selection algorithm first, then uses a valid SPS2 extension
 to authoritatively augment that same target. At the SPS2 boundary these axes are forward and frame-up; the application
 maps them to its established normal and tangent fields.
+
+The SPS2 encoder always reserves synthetic Lights 2 and 3 and serializes exact zero for their local position, RGBA, and
+attenuation, even when no valid SPS2 target is selected. Their alpha is zero, so they are disabled. When no valid SPS2
+target is selected, only Lights 0 and 1 retain Unity vertex-light fallback values. The ordinary non-SPS2 encoder continues
+to expose Unity's historical values for all four light slots.
 
 The VRCFury prefab uses a separate static Position System shader which includes the modular SPS2 atlas readers from the
 officially installed VRCFury package. It reads `_VFGridFinal`, uses the SPS cell dictionary to enumerate occupied groups,
@@ -196,6 +201,8 @@ validates socket cells, and selects the socket nearest to the encoder origin. Th
 the fragment-stage packet and CRC serialization do not repeat it for every bit.
 The selection is recomputed for every encoder draw and has no persistent target identity, so when two sockets exchange
 distance order the observer switches to the newly nearest valid socket.
+The identifier in group 42 remains stable while the same SPS2 `(player ID, unique ID)` pair is selected. It is intended
+for detecting target changes, not for recovering either source identifier; as a 32-bit hash, collisions are possible.
 
 The SPS2 integration requires VRCFury to be installed in the Unity project, but it does not require any VRCFury
 components to be used on the avatar. If VRCFury is not installed, the dedicated VRCFury SPS2 shader will fail to

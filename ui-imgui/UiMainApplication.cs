@@ -413,6 +413,8 @@ public class UiMainApplication
         ImGui.Text($"Normal: {interpreted.normal.X} {interpreted.normal.Y} {interpreted.normal.Z}");
         ImGui.Text($"HasTangent: {BoolToString(interpreted.hasTangent)}");
         ImGui.Text($"Tangent: {interpreted.tangent.X} {interpreted.tangent.Y} {interpreted.tangent.Z}");
+        ImGui.Text($"HasSocketIdentity: {BoolToString(interpreted.hasSocketIdentity)}");
+        ImGui.Text($"SocketIdentity: 0x{interpreted.socketIdentity:X8}");
         ImGui.Text($"HasSocketWorldScale: {BoolToString(interpreted.hasSocketWorldScale)}");
         ImGui.Text($"SocketWorldScale: {interpreted.socketWorldScale}");
     }
