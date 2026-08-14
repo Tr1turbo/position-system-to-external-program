@@ -183,24 +183,48 @@ The CRC-32 hash is based on groups 1 to 51 (inclusive). Protocol 1.2 uses groups
 - 49 contains the SPS2 socket flags.
 - 50 contains the selected socket's scalar world scale.
 
+# SPS2
 For SPS2 packets, the standard light fields remain a legacy-compatible target representation. Light 0 is the
 selected socket root and Light 1 is a synthetic front marker positioned so that `normalize(root - front)` reproduces the
 socket forward vector. Lights 2 and 3 are zeroed and disabled so real legacy lights cannot compete with the selected SPS2
 target. The desktop program always runs its ordinary light target-selection algorithm first, then uses a valid SPS2 extension
 to authoritatively augment that same target. At the SPS2 boundary these axes are forward and frame-up; the application
 maps them to its established normal and tangent fields.
+The robotics driver derives R0 from the current SPS2 frame relative to a fixed reference for the selected socket rather
+than accumulating frame-to-frame twist. While the twist remains within the machine range, returning a socket to its
+reference orientation therefore returns R0 to its reference command regardless of the path taken. The absolute twist
+angle is unwrapped across the `-180`/`+180` branch cut before it is clamped, so winding beyond a mechanical limit remains
+at that limit instead of jumping directly to the opposite limit. A hard-coded `TwistLimitMapping` policy maps the
+continuous virtual twist onto the partial-rotation machine. It currently uses `DiscardWindup`, so excess twist is handled
+through a separate anti-windup bias and reversing direction moves away from the limit immediately. This mode intentionally
+loses the discarded multi-turn machine position after a limit is crossed; `StoreWindup` retains exact multi-turn return
+behavior but requires the excess twist to unwind before the machine leaves the limit. Continuous orientation tracking and
+machine-limit mapping are separate so a future nonlinear, asymptotic center-seeking mapper can be added without changing
+the quaternion calculation; that mapper is not implemented yet. When the socket identity changes, the incoming frame
+becomes the new reference while preserving the current R0 command, so the orientation difference between
+sockets is not interpreted as twist. A valid no-target observation also ends the current relative-twist session, so
+disabling and later re-enabling the same socket rebases its new orientation at the held R0 in the same way as switching
+socket identities. A transient invalid packet does not end the session. At the singular pose where the socket forward axis
+is exactly opposite its reference forward axis, R0 holds its last valid value and the first resolvable frame afterward
+resets only the wrapped-angle branch at that value.
 
-The SPS2 encoder always reserves synthetic Lights 2 and 3 and serializes exact zero for their local position, RGBA, and
-attenuation, even when no valid SPS2 target is selected. Their alpha is zero, so they are disabled. When no valid SPS2
-target is selected, only Lights 0 and 1 retain Unity vertex-light fallback values. The ordinary non-SPS2 encoder continues
-to expose Unity's historical values for all four light slots.
+When a valid SPS2 target is selected, the SPS2 encoder reserves Lights 2 and 3 and serializes exact zero for their local
+position, RGBA, and attenuation. Their alpha is zero, so they are disabled while the synthetic root/front pair is
+authoritative. When no valid SPS2 target is selected, all four slots retain Unity vertex-light values, making the SPS2
+shader fully compatible with ordinary light targets. The non-SPS2 encoder likewise exposes Unity's values for all four
+light slots.
 
 The VRCFury prefab uses a separate static Position System shader which includes the modular SPS2 atlas readers from the
 officially installed VRCFury package. It reads `_VFGridFinal`, uses the SPS cell dictionary to enumerate occupied groups,
-validates socket cells, and selects the socket nearest to the encoder origin. The atlas scan runs in the vertex stage so
-the fragment-stage packet and CRC serialization do not repeat it for every bit.
-The selection is recomputed for every encoder draw and has no persistent target identity, so when two sockets exchange
-distance order the observer switches to the newly nearest valid socket.
+and validates socket cells. Genuine legacy hole/ring roots and validated SPS2 sockets compete by world-space distance
+from the encoder origin. VRCFury's real black SPS2 compatibility lights are recognized by their `.0005` to `.0007` range
+marker and excluded only from legacy candidate discovery, so they cannot compete with the authoritative atlas socket that
+emitted them. Legacy distance is measured from the root light; the front light is used only for orientation. If a genuine
+legacy root is nearest, the shader exports all four Unity vertex lights unchanged and clears words 42 to 50. If an SPS2
+socket is nearer or tied, the shader exports its synthetic root/front pair and native extension; SPS2 wins a tie because it
+carries richer frame and identity data. No extra distance bias is applied. The atlas scan runs in the vertex stage so the fragment-stage packet and
+CRC serialization do not repeat it for every bit. The selection is recomputed for every encoder draw and has no persistent
+target identity, so when candidates exchange distance order the observer switches to the newly nearest target.
 The identifier in group 42 remains stable while the same SPS2 `(player ID, unique ID)` pair is selected. It is intended
 for detecting target changes, not for recovering either source identifier; as a 32-bit hash, collisions are possible.
 
@@ -209,9 +233,10 @@ components to be used on the avatar. If VRCFury is not installed, the dedicated 
 compile. The ordinary non-SPS2 encoder shader used by the Modular Avatar and ChilloutVR prefabs does not compile any
 VRCFury code and remains available.
 
-The shader references VRCFury's installed `sps_cell_layout.cginc` module, which transitively provides the texture and
-codec helpers it needs, without copying or modifying them. This makes that include path a compile-time dependency for the
-VRCFury prefab. If no validated SPS2 socket is visible, the VRCFury shader exports Unity's four vertex lights unchanged.
+The shader references VRCFury's installed SPS2 cell-layout helpers without copying or modifying them. VRCFury is used only
+for SPS2 atlas access and decoding. Legacy light classification remains owned by `PStoEP-Light.cginc` and follows the same
+black, enabled, hole/ring range rules as the desktop Position System interpreter. The SPS2 cell-layout include path remains
+a compile-time dependency for the VRCFury prefab.
 Radius-offset is exported as a socket flag; the raw socket position is retained because a read-only observer has no plug
 radius with which to apply it.
 Socket world scale is accepted only when it is finite, positive, and between `1e-6` and `1e6`. If it is invalid, the
