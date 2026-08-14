@@ -24,11 +24,11 @@ public class DpsLightInterpreter
 
         var isHole = (decoded.Sps2SocketFlags & Sps2SocketFlagHole) != 0u;
         interpreted.hasNormal = true;
-        interpreted.normal = decoded.Sps2Forward;
+        interpreted.normal = decoded.Normal;
         interpreted.isHole = isHole;
         interpreted.isRing = (decoded.Sps2SocketFlags & Sps2SocketFlagDoubleSided) != 0u || !isHole;
         interpreted.hasTangent = true;
-        interpreted.tangent = decoded.Sps2FrameUp;
+        interpreted.tangent = decoded.Tangent;
         interpreted.hasSocketIdentity = true;
         interpreted.socketIdentity = decoded.Sps2SocketIdentity;
         interpreted.hasSocketWorldScale = true;

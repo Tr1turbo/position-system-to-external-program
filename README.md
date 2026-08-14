@@ -152,12 +152,12 @@ This is why there is reserved space for future use.
 | **40** | Euler angles of the camera (y) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
 | **41** | Euler angles of the camera (y) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
 | **42** | Nonzero opaque identifier for the selected SPS2 socket, derived from its player ID and unique ID. Zero means no validated SPS2 socket frame is available.                                                                                                | \>=1.2.0 |
-| **43** | Selected SPS2 socket forward axis (x) in encoder-local space.                                                                                                                                                                                             | \>=1.2.0 |
-| **44** | Selected SPS2 socket forward axis (y) in encoder-local space.                                                                                                                                                                                             | \>=1.2.0 |
-| **45** | Selected SPS2 socket forward axis (z) in encoder-local space.                                                                                                                                                                                             | \>=1.2.0 |
-| **46** | Selected SPS2 socket frame-up axis (x) in encoder-local space.                                                                                                                                                                                            | \>=1.2.0 |
-| **47** | Selected SPS2 socket frame-up axis (y) in encoder-local space.                                                                                                                                                                                            | \>=1.2.0 |
-| **48** | Selected SPS2 socket frame-up axis (z) in encoder-local space.                                                                                                                                                                                            | \>=1.2.0 |
+| **43** | Position System normal axis (x) in encoder-local space, equal to the negative SPS2 socket forward axis.                                                                                                                                                    | \>=1.2.0 |
+| **44** | Position System normal axis (y) in encoder-local space, equal to the negative SPS2 socket forward axis.                                                                                                                                                    | \>=1.2.0 |
+| **45** | Position System normal axis (z) in encoder-local space, equal to the negative SPS2 socket forward axis.                                                                                                                                                    | \>=1.2.0 |
+| **46** | Position System tangent axis (x) in encoder-local space, derived from the SPS2 socket frame-up axis.                                                                                                                                                       | \>=1.2.0 |
+| **47** | Position System tangent axis (y) in encoder-local space, derived from the SPS2 socket frame-up axis.                                                                                                                                                       | \>=1.2.0 |
+| **48** | Position System tangent axis (z) in encoder-local space, derived from the SPS2 socket frame-up axis.                                                                                                                                                       | \>=1.2.0 |
 | **49** | Selected SPS2 socket flags.                                                                                                                                                                                                                               | \>=1.2.0 |
 | **50** | Selected SPS2 socket scalar world scale.                                                                                                                                                                                                                  | \>=1.2.0 |
 | **51** | Canary. Equal to 1431677610, which results in a checkerboard pattern in binary. This is used to help solve alignment issues.<br/>This value can change in the future. The program will not check if this value is equal, but it is part of the checksum. |          |
@@ -178,18 +178,19 @@ If the check fails, we reuse the last known valid data.
 The CRC-32 hash is based on groups 1 to 51 (inclusive). Protocol 1.2 uses groups 42 to 50 for the SPS2 target frame:
 
 - 42 is a nonzero opaque identifier for the selected socket, derived from the SPS2 player ID and socket unique ID. Zero means that no validated SPS2 socket frame is available.
-- 43 to 45 contain the selected socket forward axis.
-- 46 to 48 contain the selected socket frame-up axis.
+- 43 to 45 contain the Position System normal axis, which is the negative of the selected socket's SPS2 forward axis.
+- 46 to 48 contain the Position System tangent axis, derived from the selected socket's SPS2 frame-up axis.
 - 49 contains the SPS2 socket flags.
 - 50 contains the selected socket's scalar world scale.
 
 # SPS2
 For SPS2 packets, the standard light fields remain a legacy-compatible target representation. Light 0 is the
-selected socket root and Light 1 is a synthetic front marker positioned so that `normalize(root - front)` reproduces the
-socket forward vector. Lights 2 and 3 are zeroed and disabled so real legacy lights cannot compete with the selected SPS2
-target. The desktop program always runs its ordinary light target-selection algorithm first, then uses a valid SPS2 extension
-to authoritatively augment that same target. At the SPS2 boundary these axes are forward and frame-up; the application
-maps them to its established normal and tangent fields.
+selected socket root and Light 1 is a synthetic front marker placed along the socket's SPS2 forward axis, matching
+VRCFury's compatibility lights. Therefore `normalize(root - front)` reproduces the Position System normal, which is the
+negative SPS2 socket forward vector. Lights 2 and 3 are zeroed and disabled so real legacy lights cannot compete with the
+selected SPS2 target. The desktop program always runs its ordinary light target-selection algorithm first, then uses a valid SPS2 extension
+to authoritatively augment that same target. At the SPS2 boundary, socket forward is negated into the established Position
+System normal convention, while socket frame-up maps directly to the tangent field.
 The robotics driver derives R0 from the current SPS2 frame relative to a fixed reference for the selected socket rather
 than accumulating frame-to-frame twist. While the twist remains within the machine range, returning a socket to its
 reference orientation therefore returns R0 to its reference command regardless of the path taken. The absolute twist
@@ -204,8 +205,8 @@ the quaternion calculation; that mapper is not implemented yet. When the socket 
 becomes the new reference while preserving the current R0 command, so the orientation difference between
 sockets is not interpreted as twist. A valid no-target observation also ends the current relative-twist session, so
 disabling and later re-enabling the same socket rebases its new orientation at the held R0 in the same way as switching
-socket identities. A transient invalid packet does not end the session. At the singular pose where the socket forward axis
-is exactly opposite its reference forward axis, R0 holds its last valid value and the first resolvable frame afterward
+socket identities. A transient invalid packet does not end the session. At the singular pose where the Position System
+normal axis is exactly opposite its reference normal axis, R0 holds its last valid value and the first resolvable frame afterward
 resets only the wrapped-angle branch at that value.
 
 When a valid SPS2 target is selected, the SPS2 encoder reserves Lights 2 and 3 and serializes exact zero for their local

@@ -19,8 +19,8 @@ public class DecodedData
 
     public bool Sps2TargetAvailable;
     public uint Sps2SocketIdentity;
-    public Vector3 Sps2Forward;
-    public Vector3 Sps2FrameUp;
+    public Vector3 Normal;
+    public Vector3 Tangent;
     public uint Sps2SocketFlags;
     public float Sps2WorldScale;
 

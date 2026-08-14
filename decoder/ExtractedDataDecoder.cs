@@ -24,8 +24,8 @@ public class ExtractedDataDecoder
     private const int CameraPositionStart = 36;
     private const int CameraRotationStart = 39;
     private const int Sps2SocketIdentity = 42;
-    private const int Sps2ForwardStart = 43;
-    private const int Sps2FrameUpStart = 46;
+    private const int NormalStart = 43;
+    private const int TangentStart = 46;
     private const int Sps2SocketFlags = 49;
     private const int Sps2WorldScale = 50;
     public const int GroupLength = 52;
@@ -101,29 +101,29 @@ public class ExtractedDataDecoder
 
         decodedMutated.Sps2TargetAvailable = false;
         decodedMutated.Sps2SocketIdentity = 0u;
-        decodedMutated.Sps2Forward = Vector3.Zero;
-        decodedMutated.Sps2FrameUp = Vector3.Zero;
+        decodedMutated.Normal = Vector3.Zero;
+        decodedMutated.Tangent = Vector3.Zero;
         decodedMutated.Sps2SocketFlags = 0u;
         decodedMutated.Sps2WorldScale = 0f;
         var sps2SocketIdentity = SampleUInt32(Sps2SocketIdentity);
         var sps2WorldScale = SampleFloat(Sps2WorldScale);
         if (versionSemverValue >= 1_002_000
             && sps2SocketIdentity != 0u
-            && ReadVector3StartingFromLine(Sps2ForwardStart, out var sps2Forward)
-            && ReadVector3StartingFromLine(Sps2FrameUpStart, out var sps2FrameUp)
-            && IsUsableDirection(sps2Forward)
-            && IsUsableDirection(sps2FrameUp)
+            && ReadVector3StartingFromLine(NormalStart, out var normal)
+            && ReadVector3StartingFromLine(TangentStart, out var tangent)
+            && IsUsableDirection(normal)
+            && IsUsableDirection(tangent)
             && IsReasonableSps2Scale(sps2WorldScale))
         {
-            var normalizedForward = Vector3.Normalize(sps2Forward);
-            var frameUpPerpendicular = sps2FrameUp
-                - normalizedForward * Vector3.Dot(sps2FrameUp, normalizedForward);
-            if (IsUsableDirection(frameUpPerpendicular))
+            var normalizedNormal = Vector3.Normalize(normal);
+            var tangentPerpendicular = tangent
+                - normalizedNormal * Vector3.Dot(tangent, normalizedNormal);
+            if (IsUsableDirection(tangentPerpendicular))
             {
                 decodedMutated.Sps2TargetAvailable = true;
                 decodedMutated.Sps2SocketIdentity = sps2SocketIdentity;
-                decodedMutated.Sps2Forward = normalizedForward;
-                decodedMutated.Sps2FrameUp = Vector3.Normalize(frameUpPerpendicular);
+                decodedMutated.Normal = normalizedNormal;
+                decodedMutated.Tangent = Vector3.Normalize(tangentPerpendicular);
                 decodedMutated.Sps2SocketFlags = SampleUInt32(Sps2SocketFlags);
                 decodedMutated.Sps2WorldScale = sps2WorldScale;
             }

@@ -23,8 +23,8 @@ static const float PSTOEP_SPS2_RANGE_FRONT = 0.4506;
 static const float PSTOEP_SPS2_FRONT_DISTANCE = 0.01;
 static const uint PSTOEP_SPS2_SOCKET_FLAG_HOLE = 1u;
 static const int PSTOEP_SPS2_GROUP_SOCKET_IDENTITY = 42;
-static const int PSTOEP_SPS2_GROUP_FORWARD_START = 43;
-static const int PSTOEP_SPS2_GROUP_FRAME_UP_START = 46;
+static const int PSTOEP_GROUP_NORMAL_START = 43;
+static const int PSTOEP_GROUP_TANGENT_START = 46;
 static const int PSTOEP_SPS2_GROUP_SOCKET_FLAGS = 49;
 static const int PSTOEP_SPS2_GROUP_WORLD_SCALE = 50;
 static const int PSTOEP_SPS2_GROUP_END = 51;
@@ -155,16 +155,19 @@ PStoEPSps2Target PStoEP_ReadSps2Target(
     return target;
 }
 
-float3 PStoEP_Sps2LocalForward(PStoEPSps2Target target)
+float3 PStoEP_Sps2LocalNormal(PStoEPSps2Target target)
 {
-    return normalize(mul((float3x3)unity_WorldToObject, target.worldForward));
+    // SPS2 sockets face along local +Z, while the Position System normal is
+    // defined by normalize(root - front). VRCFury's compatibility front light
+    // sits on socket +Z, so the equivalent Position System normal is -forward.
+    return -normalize(mul((float3x3)unity_WorldToObject, target.worldForward));
 }
 
-float3 PStoEP_Sps2LocalFrameUp(PStoEPSps2Target target)
+float3 PStoEP_Sps2LocalTangent(PStoEPSps2Target target)
 {
-    float3 forward = PStoEP_Sps2LocalForward(target);
+    float3 normal = PStoEP_Sps2LocalNormal(target);
     float3 localFrameUp = mul((float3x3)unity_WorldToObject, target.worldFrameUp);
-    return normalize(localFrameUp - forward * dot(localFrameUp, forward));
+    return normalize(localFrameUp - normal * dot(localFrameUp, normal));
 }
 
 float3 PStoEP_Sps2LightPosition(int index, PStoEPSps2Target target)
@@ -184,7 +187,7 @@ float3 PStoEP_Sps2LightPosition(int index, PStoEPSps2Target target)
     else if (index == 1)
     {
         float3 frontWorldPosition = target.worldPosition
-            - target.worldForward * PSTOEP_SPS2_FRONT_DISTANCE;
+            + target.worldForward * PSTOEP_SPS2_FRONT_DISTANCE;
         localPosition = mul(unity_WorldToObject, float4(frontWorldPosition, 1)).xyz;
     }
     return localPosition;
@@ -232,22 +235,22 @@ float PStoEP_Sps2LightAttenuation(int index, PStoEPSps2Target target)
 uint PStoEP_Sps2ExtensionData(int wordIndex, PStoEPSps2Target target)
 {
     uint extensionData = 0u;
-    if (target.frameValid && wordIndex < PSTOEP_SPS2_GROUP_FORWARD_START)
+    if (target.frameValid && wordIndex < PSTOEP_GROUP_NORMAL_START)
     {
         if (wordIndex >= PSTOEP_SPS2_GROUP_SOCKET_IDENTITY)
         {
             extensionData = target.socketIdentity;
         }
     }
-    else if (target.frameValid && wordIndex < PSTOEP_SPS2_GROUP_FRAME_UP_START)
+    else if (target.frameValid && wordIndex < PSTOEP_GROUP_TANGENT_START)
     {
-        float3 forward = PStoEP_Sps2LocalForward(target);
-        extensionData = asuint(forward[wordIndex - PSTOEP_SPS2_GROUP_FORWARD_START]);
+        float3 normal = PStoEP_Sps2LocalNormal(target);
+        extensionData = asuint(normal[wordIndex - PSTOEP_GROUP_NORMAL_START]);
     }
     else if (target.frameValid && wordIndex < PSTOEP_SPS2_GROUP_SOCKET_FLAGS)
     {
-        float3 frameUp = PStoEP_Sps2LocalFrameUp(target);
-        extensionData = asuint(frameUp[wordIndex - PSTOEP_SPS2_GROUP_FRAME_UP_START]);
+        float3 tangent = PStoEP_Sps2LocalTangent(target);
+        extensionData = asuint(tangent[wordIndex - PSTOEP_GROUP_TANGENT_START]);
     }
     else if (target.frameValid && wordIndex < PSTOEP_SPS2_GROUP_WORLD_SCALE)
     {

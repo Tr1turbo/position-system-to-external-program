@@ -50,12 +50,12 @@ public enum ShaderV1_2_0
     CameraEulerAnglesZ = 41,
 
     Sps2SocketIdentity = 42,
-    Sps2ForwardX = 43,
-    Sps2ForwardY = 44,
-    Sps2ForwardZ = 45,
-    Sps2FrameUpX = 46,
-    Sps2FrameUpY = 47,
-    Sps2FrameUpZ = 48,
+    NormalX = 43,
+    NormalY = 44,
+    NormalZ = 45,
+    TangentX = 46,
+    TangentY = 47,
+    TangentZ = 48,
     Sps2SocketFlags = 49,
     Sps2WorldScale = 50,
 
