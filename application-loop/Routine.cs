@@ -96,7 +96,10 @@ public class Routine
                 UseSimulatedTwistFromRoll = _config.roboticsUseSimulatedTwistFromRoll,
                 SimulatedTwistFromRoll = _config.roboticsSimulatedTwistFromRoll,
                 UseSimulatedTwistFromLateral = _config.roboticsUseSimulatedTwistFromLateral,
-                SimulatedTwistFromLateral = _config.roboticsSimulatedTwistFromLateral
+                SimulatedTwistFromLateral = _config.roboticsSimulatedTwistFromLateral,
+                TwistLimitMappingPolicy = _config.roboticsTwistLimitMappingPolicy,
+                TwistScale = _config.roboticsTwistScale,
+                ResetTwistOnSocketTransition = _config.roboticsResetTwistOnSocketTransition
             }
         );
     }

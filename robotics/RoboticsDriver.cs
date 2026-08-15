@@ -9,23 +9,21 @@ public class RoboticsDriver
     // FIXME: Temporarily disabled PidRoot because the PID controller is unstable.
     private const bool TEMP_CanUsePidRoot = false;
 
-    private enum TwistLimitMappingMode
-    {
-        StoreWindup,
-        DiscardWindup
-    }
-
     private struct TwistLimitMappingState
     {
         public float AntiWindupBiasDegrees;
+        public float SmoothedDirection;
+        public float SmoothedMovement;
     }
 
-    // This remains hard-coded until the machine-limit behavior has a stable UI.
-    // Add future mappings, such as an asymptotic center-seeking curve, in
-    // MapContinuousTwistToMachineCommand without changing orientation tracking.
-    private const TwistLimitMappingMode TwistLimitMapping = TwistLimitMappingMode.DiscardWindup;
     private const float MinimumTwistAngleDegrees = -135f;
     private const float MaximumTwistAngleDegrees = 135f;
+    private static readonly float TwistCoherenceHalfLifeDegrees = 15f;
+    private static readonly float TwistRandomMotionCenteringHalfLifeDegrees = 320f;
+    private const float DefaultTwistScale = 1f;
+    private const float MinimumTwistScale = 0.1f;
+    private const float MaximumTwistScale = 2f;
+    private const float MaximumTwistPolicyIntegrationStepDegrees = 0.25f;
     private const float MinimumUsableDirectionLengthSquared = 0.000001f;
     private const float AntipodalTwistSingularityDotThreshold = -0.99f;
     
@@ -47,6 +45,9 @@ public class RoboticsDriver
     
     private float _configTwistFromRoll;
     private float _configTwistFromLateral;
+    private TwistLimitMappingPolicy _configTwistLimitMappingPolicy = TwistLimitMappingPolicy.LinearDiscardWindup;
+    private float _configTwistScale = DefaultTwistScale;
+    private bool _configResetTwistOnSocketTransition;
     
     //
     
@@ -129,10 +130,7 @@ public class RoboticsDriver
         {
             // TODO: If there is no target, we need to remember that, so that when a target appears,
             // we don't immediately slam the robotic arm because the data has changed too much.
-            // Losing a valid target ends its relative-twist session. If the same
-            // socket is enabled again, its first frame is rebased at the current
-            // machine command just like a switch to a different socket identity.
-            ClearAbsoluteTwistReference();
+            ApplySocketTransitionPolicy();
             return;
         }
 
@@ -268,24 +266,22 @@ public class RoboticsDriver
             return _boundedTwistCommandDegrees;
         }
 
-        var socketChanged = _absoluteTwistReferenceInitialized
-            && (hasSocketIdentity != _absoluteTwistReferenceHasSocketIdentity
-                || (hasSocketIdentity && socketIdentity != _absoluteTwistReferenceSocketIdentity));
-        if (!_absoluteTwistReferenceInitialized || socketChanged)
+        var socketChanged = _absoluteTwistReferenceInitialized && !IsSameSocketIdentity(
+            hasSocketIdentity,
+            socketIdentity,
+            _absoluteTwistReferenceHasSocketIdentity,
+            _absoluteTwistReferenceSocketIdentity
+        );
+        if (!_absoluteTwistReferenceInitialized)
         {
-            // A socket swap establishes a new zero-twist frame at the current
-            // machine command. The orientation difference between two sockets is
-            // never interpreted as physical twist.
-            _absoluteTwistReferenceNormal = normal;
-            _absoluteTwistReferenceFrameUp = frameUp;
-            _absoluteTwistReferenceCommandDegrees = _boundedTwistCommandDegrees;
-            _absoluteTwistReferenceHasSocketIdentity = hasSocketIdentity;
-            _absoluteTwistReferenceSocketIdentity = hasSocketIdentity ? socketIdentity : 0u;
-            _absoluteTwistPreviousWrappedDegrees = 0f;
-            _continuousTwistDegrees = 0f;
-            _twistLimitMappingState = default;
-            _absoluteTwistResetWrappedBranchAfterSingularity = false;
-            _absoluteTwistReferenceInitialized = true;
+            RebaseAbsoluteTwist(normal, frameUp, hasSocketIdentity, socketIdentity);
+            return _boundedTwistCommandDegrees;
+        }
+
+        if (socketChanged)
+        {
+            ApplySocketTransitionPolicy();
+            RebaseAbsoluteTwist(normal, frameUp, hasSocketIdentity, socketIdentity);
             return _boundedTwistCommandDegrees;
         }
 
@@ -320,39 +316,41 @@ public class RoboticsDriver
 
         // Continuous orientation tracking is independent from the partial-rotation
         // machine. The selected mapper owns all saturation and anti-windup state.
-        _boundedTwistCommandDegrees = MapContinuousTwistToMachineCommand(
-            TwistLimitMapping,
+        _boundedTwistCommandDegrees = MapVirtualTwistToMachineCommand(
+            _configTwistLimitMappingPolicy,
+            _boundedTwistCommandDegrees,
             _absoluteTwistReferenceCommandDegrees,
             _continuousTwistDegrees,
+            wrappedDeltaDegrees,
+            _configTwistScale,
             ref _twistLimitMappingState
         );
         return _boundedTwistCommandDegrees;
     }
 
-    private static float MapContinuousTwistToMachineCommand(
-        TwistLimitMappingMode mappingMode,
+    private static float MapVirtualTwistToMachineCommand(
+        TwistLimitMappingPolicy mappingPolicy,
+        float currentCommandDegrees,
         float referenceCommandDegrees,
         float continuousTwistDegrees,
+        float deltaTwistDegrees,
+        float twistScale,
         ref TwistLimitMappingState mappingState)
     {
-        // A future center-seeking mapping can live entirely in this method. For
-        // example, an inverse-anchored tanh curve can preserve the reference
-        // command, increasingly resist outward rotation, emphasize equal inward
-        // rotation, and approach the mechanical limits only at infinite input.
         var desiredCommandDegrees = referenceCommandDegrees
-            + continuousTwistDegrees
+            + continuousTwistDegrees * twistScale
             + mappingState.AntiWindupBiasDegrees;
 
-        switch (mappingMode)
+        switch (mappingPolicy)
         {
-            case TwistLimitMappingMode.StoreWindup:
+            case TwistLimitMappingPolicy.LinearStoreWindup:
                 return Clamp(
                     desiredCommandDegrees,
                     MinimumTwistAngleDegrees,
                     MaximumTwistAngleDegrees
                 );
 
-            case TwistLimitMappingMode.DiscardWindup:
+            case TwistLimitMappingPolicy.LinearDiscardWindup:
                 var clampedCommandDegrees = Clamp(
                     desiredCommandDegrees,
                     MinimumTwistAngleDegrees,
@@ -361,9 +359,106 @@ public class RoboticsDriver
                 mappingState.AntiWindupBiasDegrees += clampedCommandDegrees - desiredCommandDegrees;
                 return clampedCommandDegrees;
 
+            case TwistLimitMappingPolicy.CenterSeekingRelative:
+                return ApplyCenterSeekingRelativeMapping(
+                    currentCommandDegrees,
+                    deltaTwistDegrees,
+                    twistScale,
+                    ref mappingState
+                );
+
             default:
                 throw new ArgumentOutOfRangeException();
         }
+    }
+
+    private static float ApplyCenterSeekingRelativeMapping(
+        float currentCommandDegrees,
+        float deltaTwistDegrees,
+        float twistScale,
+        ref TwistLimitMappingState mappingState)
+    {
+        var remainingDegrees = MathF.Abs(deltaTwistDegrees);
+        if (remainingDegrees <= 0f) return currentCommandDegrees;
+
+        var direction = MathF.Sign(deltaTwistDegrees);
+        var commandDegrees = currentCommandDegrees;
+
+        while (remainingDegrees > 0f)
+        {
+            var stepDegrees = MathF.Min(remainingDegrees, MaximumTwistPolicyIntegrationStepDegrees);
+            remainingDegrees -= stepDegrees;
+
+            var coherenceDecay = MathF.Pow(0.5f, stepDegrees / TwistCoherenceHalfLifeDegrees);
+            mappingState.SmoothedDirection = mappingState.SmoothedDirection * coherenceDecay
+                + direction * (1f - coherenceDecay);
+            mappingState.SmoothedMovement = mappingState.SmoothedMovement * coherenceDecay
+                + (1f - coherenceDecay);
+
+            var coherence = mappingState.SmoothedMovement > 0f
+                ? Clamp(
+                    MathF.Abs(mappingState.SmoothedDirection) / mappingState.SmoothedMovement,
+                    0f,
+                    1f
+                )
+                : 1f;
+            var randomness = 1f - coherence;
+
+            // Scale affects the signed R0 response without changing the movement
+            // distance used by coherence and centering.
+            commandDegrees += direction * stepDegrees * twistScale;
+            commandDegrees *= MathF.Pow(
+                0.5f,
+                randomness * stepDegrees / TwistRandomMotionCenteringHalfLifeDegrees
+            );
+            commandDegrees = Clamp(
+                commandDegrees,
+                MinimumTwistAngleDegrees,
+                MaximumTwistAngleDegrees
+            );
+        }
+
+        return commandDegrees;
+    }
+
+    private void RebaseAbsoluteTwist(
+        Vector3 normal,
+        Vector3 frameUp,
+        bool hasSocketIdentity,
+        uint socketIdentity)
+    {
+        _absoluteTwistReferenceNormal = normal;
+        _absoluteTwistReferenceFrameUp = frameUp;
+        _absoluteTwistReferenceCommandDegrees = _boundedTwistCommandDegrees;
+        _absoluteTwistReferenceHasSocketIdentity = hasSocketIdentity;
+        _absoluteTwistReferenceSocketIdentity = hasSocketIdentity ? socketIdentity : 0u;
+        _absoluteTwistPreviousWrappedDegrees = 0f;
+        _continuousTwistDegrees = 0f;
+        _twistLimitMappingState = default;
+        _absoluteTwistResetWrappedBranchAfterSingularity = false;
+        _absoluteTwistReferenceInitialized = true;
+    }
+
+    private void ApplySocketTransitionPolicy()
+    {
+        if (_configResetTwistOnSocketTransition)
+        {
+            _boundedTwistCommandDegrees = 0f;
+        }
+
+        _unsafeAngleDegR0 = _boundedTwistCommandDegrees;
+        _safeAngleDegTargetR0 = Clamp(_unsafeAngleDegR0 + _offsetAngleDegR0, -360f, 360f);
+        ClearAbsoluteTwistReference();
+    }
+
+    private static bool IsSameSocketIdentity(
+        bool firstHasIdentity,
+        uint firstIdentity,
+        bool secondHasIdentity,
+        uint secondIdentity)
+    {
+        return firstHasIdentity == secondHasIdentity
+            && (!firstHasIdentity || firstIdentity == secondIdentity);
     }
 
     private static bool TryCreateTwistFrame(
@@ -616,6 +711,13 @@ public class RoboticsDriver
 
         _configTwistFromRoll = config.UseSimulatedTwistFromRoll ? config.SimulatedTwistFromRoll : 0f;
         _configTwistFromLateral = config.UseSimulatedTwistFromLateral ? config.SimulatedTwistFromLateral : 0f;
+        _configTwistLimitMappingPolicy = Enum.IsDefined(config.TwistLimitMappingPolicy)
+            ? config.TwistLimitMappingPolicy
+            : TwistLimitMappingPolicy.LinearDiscardWindup;
+        _configTwistScale = float.IsFinite(config.TwistScale)
+            ? Clamp(config.TwistScale, MinimumTwistScale, MaximumTwistScale)
+            : DefaultTwistScale;
+        _configResetTwistOnSocketTransition = config.ResetTwistOnSocketTransition;
         ClearAbsoluteTwistReference();
     }
     
@@ -634,5 +736,8 @@ public class RoboticsDriver
         public float SimulatedTwistFromRoll { get; init; }
         public bool UseSimulatedTwistFromLateral { get; init; }
         public float SimulatedTwistFromLateral { get; init; }
+        public TwistLimitMappingPolicy TwistLimitMappingPolicy { get; init; }
+        public float TwistScale { get; init; }
+        public bool ResetTwistOnSocketTransition { get; init; }
     }
 }

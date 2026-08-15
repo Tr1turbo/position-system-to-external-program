@@ -105,5 +105,13 @@ public class LocalizationPhrase
         public static string UseSimulatedTwistFromLateralLabel => LocalizeOrElse(nameof(UseSimulatedTwistFromLateralLabel), "Use simulated twist from Lateral");
         public static string SimulatedTwistFromRollLabel => LocalizeOrElse(nameof(SimulatedTwistFromRollLabel), "Simulated twist from Roll");
         public static string SimulatedTwistFromLateralLabel => LocalizeOrElse(nameof(SimulatedTwistFromLateralLabel), "Simulated twist from Lateral");
+        public static string TwistMappingPolicyLabel => LocalizeOrElse(nameof(TwistMappingPolicyLabel), "Twist Mapping");
+        public static string TwistMappingLinearDiscardLabel => LocalizeOrElse(nameof(TwistMappingLinearDiscardLabel), "Linear Mapping (Discard Excess Twist)");
+        public static string TwistMappingLinearStoreLabel => LocalizeOrElse(nameof(TwistMappingLinearStoreLabel), "Linear Mapping (Retain Excess Twist)");
+        public static string TwistMappingCenterSeekingRelativeLabel => LocalizeOrElse(nameof(TwistMappingCenterSeekingRelativeLabel), "Center-Seeking Relative Mapping");
+        public static string TwistScaleLabel => LocalizeOrElse(nameof(TwistScaleLabel), "Twist Scale");
+        public static string TwistMappingPolicyHelper => LocalizeOrElse(nameof(TwistMappingPolicyHelper), "Twist Scale controls R0 degrees per virtual degree.");
+        public static string ResetTwistOnSocketTransitionLabel => LocalizeOrElse(nameof(ResetTwistOnSocketTransitionLabel), "Reset Twist on Socket Loss or Identity Change");
+        public static string TwistSocketPolicyHelper => LocalizeOrElse(nameof(TwistSocketPolicyHelper), "When enabled, the R0 command resets to 0 immediately; otherwise, the current twist command is preserved.");
     }
 }

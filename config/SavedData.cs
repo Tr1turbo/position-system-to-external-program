@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using Hai.PositionSystemToExternalProgram.Core;
 using Newtonsoft.Json;
 
 namespace Hai.PositionSystemToExternalProgram.Configuration;
@@ -41,6 +42,9 @@ public class SavedData
     public bool roboticsUseSimulatedTwistFromRoll = false;
     public float roboticsSimulatedTwistFromLateral = 1f;
     public float roboticsSimulatedTwistFromRoll = 1f;
+    public TwistLimitMappingPolicy roboticsTwistLimitMappingPolicy = TwistLimitMappingPolicy.LinearDiscardWindup;
+    public float roboticsTwistScale = 1f;
+    public bool roboticsResetTwistOnSocketTransition = false;
 
     public bool useWebsockets = false;
     

@@ -90,6 +90,46 @@ public class UiRoboticsTab
         ImGui.NewLine();
         ImGui.SeparatorText(LocalizationPhrase.RoboticsLocalizationPhrase.TwistLabel);
 
+        var twistMappingPolicies = new[]
+        {
+            TwistLimitMappingPolicy.LinearDiscardWindup,
+            TwistLimitMappingPolicy.LinearStoreWindup,
+            TwistLimitMappingPolicy.CenterSeekingRelative
+        };
+        var twistMappingPolicyLabels = new[]
+        {
+            LocalizationPhrase.RoboticsLocalizationPhrase.TwistMappingLinearDiscardLabel,
+            LocalizationPhrase.RoboticsLocalizationPhrase.TwistMappingLinearStoreLabel,
+            LocalizationPhrase.RoboticsLocalizationPhrase.TwistMappingCenterSeekingRelativeLabel
+        };
+        var twistMappingPolicy = Array.IndexOf(
+            twistMappingPolicies,
+            _config.roboticsTwistLimitMappingPolicy
+        );
+        if (twistMappingPolicy < 0) twistMappingPolicy = 0;
+        if (ImGui.Combo(
+                LocalizationPhrase.RoboticsLocalizationPhrase.TwistMappingPolicyLabel,
+                ref twistMappingPolicy,
+                twistMappingPolicyLabels,
+                twistMappingPolicyLabels.Length))
+        {
+            _config.roboticsTwistLimitMappingPolicy = twistMappingPolicies[twistMappingPolicy];
+            anyRoboticsConfigurationChanged = true;
+        }
+        anyRoboticsConfigurationChanged |= ImGui.SliderFloat(
+            LocalizationPhrase.RoboticsLocalizationPhrase.TwistScaleLabel,
+            ref _config.roboticsTwistScale,
+            0.1f,
+            2f
+        );
+        ImGui.TextWrapped(LocalizationPhrase.RoboticsLocalizationPhrase.TwistMappingPolicyHelper);
+
+        anyRoboticsConfigurationChanged |= ImGui.Checkbox(
+            LocalizationPhrase.RoboticsLocalizationPhrase.ResetTwistOnSocketTransitionLabel,
+            ref _config.roboticsResetTwistOnSocketTransition
+        );
+        ImGui.TextWrapped(LocalizationPhrase.RoboticsLocalizationPhrase.TwistSocketPolicyHelper);
+
         anyRoboticsConfigurationChanged |= ImGui.Checkbox(LocalizationPhrase.RoboticsLocalizationPhrase.UseSimulatedTwistFromRollLabel, ref _config.roboticsUseSimulatedTwistFromRoll);
         ImGui.BeginDisabled(!_config.roboticsUseSimulatedTwistFromRoll);
         anyRoboticsConfigurationChanged |= ImGui.SliderFloat(LocalizationPhrase.RoboticsLocalizationPhrase.SimulatedTwistFromRollLabel, ref _config.roboticsSimulatedTwistFromRoll, -5f, 5f);
@@ -105,6 +145,9 @@ public class UiRoboticsTab
             _config.roboticsUseSimulatedTwistFromLateral = true;
             _config.roboticsSimulatedTwistFromRoll = 1f;
             _config.roboticsSimulatedTwistFromLateral = 1f;
+            _config.roboticsTwistLimitMappingPolicy = TwistLimitMappingPolicy.LinearDiscardWindup;
+            _config.roboticsTwistScale = 1f;
+            _config.roboticsResetTwistOnSocketTransition = false;
             anyRoboticsConfigurationChanged = true;
         }
 

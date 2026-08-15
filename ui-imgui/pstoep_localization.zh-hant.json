@@ -63,5 +63,13 @@
     "RoboticsLocalizationPhrase__label_MsgNotDefaultWarning": "此值不是預設值。如果您認為機器行為有異常，請按重設按鈕。",
     "RoboticsLocalizationPhrase__label_MsgNotLimitedWarning": "機器的移動未受限制。如果您使用的機器能夠相對於主軸橫向移動，這可能構成風險。",
     "RoboticsLocalizationPhrase__label_MsgRotateMachineHelper": "這將旋轉整台機器，使虛擬空間中一個方向的移動在物理空間中產生不同方向的移動。",
-    "RoboticsLocalizationPhrase__label_MsgVirtualScaleHelper": "大於 1 的值表示在虛擬空間中需要更多的移動才能在物理空間中移動相同的距離。"
+    "RoboticsLocalizationPhrase__label_MsgVirtualScaleHelper": "大於 1 的值表示在虛擬空間中需要更多的移動才能在物理空間中移動相同的距離。",
+    "RoboticsLocalizationPhrase__label_TwistMappingPolicyLabel": "扭轉映射",
+    "RoboticsLocalizationPhrase__label_TwistMappingLinearDiscardLabel": "線性映射（捨棄超出範圍的扭轉）",
+    "RoboticsLocalizationPhrase__label_TwistMappingLinearStoreLabel": "線性映射（保留超出範圍的扭轉）",
+    "RoboticsLocalizationPhrase__label_TwistMappingCenterSeekingRelativeLabel": "中心趨近相對映射",
+    "RoboticsLocalizationPhrase__label_TwistScaleLabel": "扭轉比例",
+    "RoboticsLocalizationPhrase__label_TwistMappingPolicyHelper": "扭轉比例控制每一虛擬角度對應的 R0 角度。",
+    "RoboticsLocalizationPhrase__label_ResetTwistOnSocketTransitionLabel": "插槽消失或切換時重設扭轉",
+    "RoboticsLocalizationPhrase__label_TwistSocketPolicyHelper": "啟用後，插槽消失或切換時 R0 指令會立即重設為 0；停用時則保留目前的扭轉指令。"
 }
