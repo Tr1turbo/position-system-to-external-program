@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
 using Hai.PositionSystemToExternalProgram.Configuration;
@@ -27,7 +27,7 @@ public class Routine
     private readonly BitsTransformer _toBits;
     private readonly ExtractedDataDecoder _decoder;
     private readonly PositionSystemDataLayout _layout;
-    private readonly DpsLightInterpreter _interpreter;
+    private readonly TargetInterpreter _interpreter;
     private readonly RoboticsDriver _roboticsDriver;
     private readonly ScaleEvaluator _scaleEvaluator;
 
@@ -38,7 +38,7 @@ public class Routine
     public ExtractionResult ExtractedData { get; private set; }
     public bool[] Bits { get; private set; }
     public DecodedData Data { get; }
-    public InterpretedLightData InterpretedData { get; private set; }
+    public InterpretedTargetData InterpretedTarget { get; private set; }
     public float VirtualScale { get; private set; } = 1f;
     
     //
@@ -54,7 +54,7 @@ public class Routine
     private bool _websocketStarted;
 
     private bool _hasReceivedDirectLightData;
-    private InterpretedLightData _directLightData;
+    private InterpretedTargetData _directTarget;
     private int _directExtraction;
     private readonly Stopwatch _tickWatch = new();
 
@@ -126,7 +126,7 @@ public class Routine
         WindowGdiExtractor windowGdiExtractor,
         BitsTransformer toBits,
         ExtractedDataDecoder decoder,
-        DpsLightInterpreter interpreter,
+        TargetInterpreter interpreter,
         RoboticsDriver roboticsDriver,
         TcodeSerial serial,
         IntifaceTransmitter intiface)
@@ -298,8 +298,8 @@ public class Routine
 
                 if (Data.validity == DataValidity.Ok)
                 {
-                    InterpretedData = _interpreter.Interpret(Data);
-                    _roboticsDriver.ProvideTargets(InterpretedData);
+                    InterpretedTarget = _interpreter.Interpret(Data);
+                    _roboticsDriver.ProvideTargets(InterpretedTarget);
                 }
                 else
                 {
@@ -313,12 +313,12 @@ public class Routine
             {
                 _lastExtractionIteration = _directExtraction;
                 
-                InterpretedData = _directLightData;
-                _roboticsDriver.ProvideTargets(InterpretedData);
+                InterpretedTarget = _directTarget;
+                _roboticsDriver.ProvideTargets(InterpretedTarget);
             }
         }
 
-        if (IsOpenVrRunning && Data.validity == DataValidity.Ok && Data.Version >= 1_001_000)
+        if (IsOpenVrRunning && Data.validity == DataValidity.Ok && ShaderProtocols.SupportsCameraPosition(Data.Version))
         {
             _ovrExtractor.Additions.UpdatePoses();
             var hmdPosition = _ovrExtractor.Additions.GetHmdPositionAsUnityVector();
@@ -390,18 +390,18 @@ public class Routine
 
     public void ReceiveDirectControl(float positionX, float positionY, float positionZ, float normalX, float normalY, float normalZ)
     {
-        InternalDirectLightData(new Vector3(positionX, positionY, positionZ), new Vector3(normalX, normalY, normalZ), null);
+        SetDirectTarget(new Vector3(positionX, positionY, positionZ), new Vector3(normalX, normalY, normalZ), null);
     }
 
     public void ReceiveDirectControl(float positionX, float positionY, float positionZ, float normalX, float normalY, float normalZ, float tangentX, float tangentY, float tangentZ)
     {
-        InternalDirectLightData(new Vector3(positionX, positionY, positionZ), new Vector3(normalX, normalY, normalZ), new Vector3(tangentX, tangentY, tangentZ));;
+        SetDirectTarget(new Vector3(positionX, positionY, positionZ), new Vector3(normalX, normalY, normalZ), new Vector3(tangentX, tangentY, tangentZ));;
     }
 
-    private void InternalDirectLightData(Vector3 position, Vector3 normalUntrusted, Vector3? tangentUntrustedNullable)
+    private void SetDirectTarget(Vector3 position, Vector3 normalUntrusted, Vector3? tangentUntrustedNullable)
     {
         _hasReceivedDirectLightData = true;
-        _directLightData = new InterpretedLightData
+        _directTarget = new InterpretedTargetData
         {
             position = position,
             normal = Vector3.Normalize(normalUntrusted),

@@ -1,4 +1,4 @@
-﻿
+
 using System.Numerics;
 using Hai.PositionSystemToExternalProgram.Core;
 
@@ -124,9 +124,9 @@ public class RoboticsDriver
         return TEMP_CanUsePidRoot && _configUsePidRoot;
     }
 
-    public void ProvideTargets(InterpretedLightData interpretedData)
+    public void ProvideTargets(InterpretedTargetData target)
     {
-        if (!interpretedData.hasTarget)
+        if (!target.hasTarget)
         {
             // TODO: If there is no target, we need to remember that, so that when a target appears,
             // we don't immediately slam the robotic arm because the data has changed too much.
@@ -138,14 +138,14 @@ public class RoboticsDriver
         {
             // Confine the input light position to a centered box and make it match the robotics coordinate system.
             var reorientedPosition = new Vector3(
-                interpretedData.position.Y,
-                -interpretedData.position.Z,
-                interpretedData.position.X
+                target.position.Y,
+                -target.position.Z,
+                target.position.X
             );
             var reorientedNormal = new Vector3(
-                interpretedData.normal.Y,
-                -interpretedData.normal.Z,
-                interpretedData.normal.X
+                target.normal.Y,
+                -target.normal.Z,
+                target.normal.X
             );
             // Rotate the entire system
             if (_configRotateSystemAngleDegPitch != 0)
@@ -189,19 +189,19 @@ public class RoboticsDriver
                 // It is explicitly NOT the available range within the hard limits.
                 _unsafeVerticality = (_unsafeJoystickTargetL0 + 1) / 2f;
 
-                if (interpretedData.hasNormal)
+                if (target.hasNormal)
                 {
                     // Perform a normal to degree conversion. This limits the range from -90 to +90.
-                    if (interpretedData.hasTangent)
+                    if (target.hasTangent)
                     {
                         // Twist is calculated in the original encoder coordinate system. The
                         // virtual-to-robotics axis remap is a reflection, which cannot be
                         // represented by a quaternion and would reverse rotation handedness.
                         _unsafeAngleDegR0 = UpdateAbsoluteTwist(
-                            interpretedData.normal,
-                            interpretedData.tangent,
-                            interpretedData.hasSocketIdentity,
-                            interpretedData.socketIdentity
+                            target.normal,
+                            target.tangent,
+                            target.hasSocketIdentity,
+                            target.socketIdentity
                         );
                     }
                     else

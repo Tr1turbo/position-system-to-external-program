@@ -1,69 +1,84 @@
-﻿using System.Numerics;
+using System.Numerics;
 using Hai.PositionSystemToExternalProgram.Core;
 
 namespace Hai.PositionSystemToExternalProgram.Decoder;
 
-/// Using light information coming from ExtractedDataDecoder, interpret DPS-like light data.
-public class DpsLightInterpreter
+/// Interprets decoded data into exactly one robotics target.
+public class TargetInterpreter
 {
     private const float LightRangeForHole = 0.41f;
     private const float LightRangeForRing = 0.42f;
     private const float LightRangeForDirectionNormal = 0.45f;
-        
+
     private const float SuspiciousNormalDistanceLimit = 0.3f;
 
-    public InterpretedLightData Interpret(DecodedData decoded)
+    public InterpretedTargetData Interpret(DecodedData decoded)
     {
-        if (decoded.Version == ShaderV2_0_0.Version)
+        if (ShaderProtocols.IsProtocol2(decoded.Version))
         {
-            return InterpretSemanticEntities(decoded);
-        }
+            var selected = SelectTarget(decoded.Entities);
+            if (selected == null)
+            {
+                return InterpretedTargetData.NoTarget();
+            }
 
-        return InterpretLegacyLights(decoded);
+            var target = Interpret(selected.Value.Entity);
+            target.hasSourceEntitySlot = true;
+            target.sourceEntitySlot = selected.Value.Slot;
+            return target;
+        }
+        if (ShaderProtocols.IsProtocol1(decoded.Version))
+        {
+            return Interpret(decoded.Lights);
+        }
+        return InterpretedTargetData.NoTarget();
     }
 
-    private static InterpretedLightData InterpretSemanticEntities(DecodedData decoded)
+    /// Selects the nearest present, known, socket-like decoded entity.
+    /// Plugs are retained for debugging but are not robotics targets.
+    private static (DecodedEntity Entity, int Slot)? SelectTarget(DecodedEntity[] entities)
     {
-        var target = decoded.Entities
-            .Select((entity, slot) => new { entity, slot })
-            .Where(candidate => candidate.entity.Present
-                && candidate.entity.DescriptorKnown
-                && candidate.entity.IsSocketLike)
-            .OrderBy(candidate => candidate.entity.Position.LengthSquared())
-            .ThenBy(candidate => candidate.slot)
-            .Select(candidate => candidate.entity)
-            .FirstOrDefault();
-
-        if (target == null)
+        (DecodedEntity Entity, int Slot)? best = null;
+        for (var slot = 0; slot < entities.Length; slot++)
         {
-            return new InterpretedLightData { hasTarget = false };
-        }
+            var entity = entities[slot];
+            if (!entity.Present || !entity.DescriptorKnown || !entity.IsSocketLike) continue;
 
-        var interpreted = new InterpretedLightData
+            if (best == null || entity.Position.LengthSquared() < best.Value.Entity.Position.LengthSquared())
+            {
+                best = (entity, slot);
+            }
+        }
+        return best;
+    }
+
+    private static InterpretedTargetData Interpret(DecodedEntity entity)
+    {
+        var interpreted = new InterpretedTargetData
         {
             hasTarget = true,
-            position = target.Position,
-            isHole = target.EntityKind == PositionSystemEntityKind.Hole,
-            isRing = target.EntityKind is PositionSystemEntityKind.Ring
+            position = entity.Position,
+            isHole = entity.EntityKind == PositionSystemEntityKind.Hole,
+            isRing = entity.EntityKind is PositionSystemEntityKind.Ring
                 or PositionSystemEntityKind.OneWayRing,
-            hasSocketWorldScale = float.IsFinite(target.Scale),
-            socketWorldScale = float.IsFinite(target.Scale) ? target.Scale : 1f,
+            hasSocketWorldScale = float.IsFinite(entity.Scale),
+            socketWorldScale = float.IsFinite(entity.Scale) ? entity.Scale : 1f,
         };
 
-        if (target.ForwardAvailable)
+        if (entity.ForwardAvailable)
         {
             interpreted.hasNormal = true;
-            interpreted.normal = -target.Forward;
+            interpreted.normal = -entity.Forward;
         }
-        if (target.UpAvailable)
+        if (entity.UpAvailable)
         {
             interpreted.hasTangent = true;
-            interpreted.tangent = target.Up;
+            interpreted.tangent = entity.Up;
         }
-        if (target.OwnerIdentityAvailable || target.EntityIdentityAvailable)
+        if (entity.OwnerIdentityAvailable || entity.EntityIdentityAvailable)
         {
             interpreted.hasSocketIdentity = true;
-            interpreted.socketIdentity = HashIdentity(target);
+            interpreted.socketIdentity = HashIdentity(entity);
         }
         return interpreted;
     }
@@ -81,9 +96,9 @@ public class DpsLightInterpreter
         return value != 0u ? value : 1u;
     }
 
-    private static InterpretedLightData InterpretLegacyLights(DecodedData decoded)
+    private static InterpretedTargetData Interpret(DecodedLight[] decodedLights)
     {
-        var lights = decoded.Lights.Where(IsBlackLight).ToList();
+        var lights = decodedLights.Where(IsBlackLight).ToList();
 
         var holes = lights.Where(light => EncodesRange(light, LightRangeForHole)).OrderBy(LocalPosSqrMagnitude).ToList();
         var rings = lights.Where(light => EncodesRange(light, LightRangeForRing)).OrderBy(LocalPosSqrMagnitude).ToList();
@@ -105,8 +120,8 @@ public class DpsLightInterpreter
                 if (Vector3.Distance(position, closestDirectionIndicators.position) < SuspiciousNormalDistanceLimit)
                 {
                     var normal = Vector3.Normalize(position - closestDirectionIndicators.position);
-                    
-                    return new InterpretedLightData
+
+                    return new InterpretedTargetData
                     {
                         hasTarget = true,
                         position = position,
@@ -118,7 +133,7 @@ public class DpsLightInterpreter
                 }
             }
 
-            return new InterpretedLightData
+            return new InterpretedTargetData
             {
                 hasTarget = true,
                 position = position,
@@ -127,7 +142,7 @@ public class DpsLightInterpreter
             };
         }
 
-        return new InterpretedLightData
+        return new InterpretedTargetData
         {
             hasTarget = false
         };

@@ -1,4 +1,4 @@
-﻿namespace Hai.PositionSystemToExternalProgram.Core;
+namespace Hai.PositionSystemToExternalProgram.Core;
 
 public interface IUiActions
 {
@@ -16,7 +16,7 @@ public interface IUiActions
     ExtractionCoordinates VrCoordinates();
     ExtractionCoordinates WindowCoordinates();
     DecodedData Data();
-    InterpretedLightData InterpretedData();
+    InterpretedTargetData InterpretedTarget();
     float VirtualScale();
     Dictionary<string, string> FetchPortNames();
     void ConfigCoordinatesUpdated();

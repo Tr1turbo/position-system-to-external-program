@@ -53,7 +53,7 @@ public class UiActions : IUiActions
     public ExtractionCoordinates VrCoordinates() => _routine.VrCoordinates;
     public ExtractionCoordinates WindowCoordinates() => _routine.WindowCoordinates;
     public DecodedData Data() => _routine.Data;
-    public InterpretedLightData InterpretedData() => _routine.InterpretedData;
+    public InterpretedTargetData InterpretedTarget() => _routine.InterpretedTarget;
     public float VirtualScale() => _routine.VirtualScale;
 
     public Dictionary<string, string> FetchPortNames()

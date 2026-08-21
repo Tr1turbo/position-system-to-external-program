@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Hai.PositionSystemToExternalProgram.Actions;
 using Hai.PositionSystemToExternalProgram.Configuration;
 using Hai.PositionSystemToExternalProgram.Core;
@@ -47,7 +47,7 @@ internal class MainApp
         var toBits = new BitsTransformer(layout);
         var decoder = new ExtractedDataDecoder();
         
-        var interpreter = new DpsLightInterpreter();
+        var interpreter = new TargetInterpreter();
         var roboticsDriver = new RoboticsDriver();
         
         // Core

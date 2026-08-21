@@ -1,4 +1,4 @@
-﻿namespace Hai.PositionSystemToExternalProgram.ImGuiProgram;
+namespace Hai.PositionSystemToExternalProgram.ImGuiProgram;
 
 public class LocalizationPhrase
 {
@@ -19,22 +19,27 @@ public class LocalizationPhrase
         public static string DataCalibrationLabel => LocalizeOrElse(nameof(DataCalibrationLabel), "Data calibration");
         public static string DataLabel => LocalizeOrElse(nameof(DataLabel), "Data");
         public static string DebugLabel => LocalizeOrElse(nameof(DebugLabel), "Debug");
+        public static string EntitiesLabel => LocalizeOrElse(nameof(EntitiesLabel), "Entities");
         public static string EstimatedScaleLabel => LocalizeOrElse(nameof(EstimatedScaleLabel), "Estimated scale");
         public static string ExposeWebsocketsOnPortLabel => LocalizeOrElse(nameof(ExposeWebsocketsOnPortLabel), "Expose WebSockets on port {0}");
         public static string ExtractorPreferenceLabel => LocalizeOrElse(nameof(ExtractorPreferenceLabel), "Extractor Preference");
         public static string InterpretedDataLabel => LocalizeOrElse(nameof(InterpretedDataLabel), "Interpreted data");
         public static string LightsLabel => LocalizeOrElse(nameof(LightsLabel), "Lights");
         public static string ModeLabel => LocalizeOrElse(nameof(ModeLabel), "Mode");
+        public static string NoneLabel => LocalizeOrElse(nameof(NoneLabel), "None");
         public static string OpenVrLabel => LocalizeOrElse(nameof(OpenVrLabel), "OpenVR");
         public static string RefreshLabel => LocalizeOrElse(nameof(RefreshLabel), "Refresh");
         public static string ResetToDefaultsExceptWindowNameLabel => LocalizeOrElse(nameof(ResetToDefaultsExceptWindowNameLabel), "Reset to defaults (except Window name)");
         public static string ResetToDefaultsLabel => LocalizeOrElse(nameof(ResetToDefaultsLabel), "Reset to defaults");
         public static string RoboticsAdvancedLabel => LocalizeOrElse(nameof(RoboticsAdvancedLabel), "Robotics (Advanced)");
         public static string RoboticsLabel => LocalizeOrElse(nameof(RoboticsLabel), "Robotics");
+        public static string SelectedForRoboticsLabel => LocalizeOrElse(nameof(SelectedForRoboticsLabel), "Selected for robotics");
+        public static string SelectedTargetLabel => LocalizeOrElse(nameof(SelectedTargetLabel), "Selected target");
         public static string ShaderVersionLabel => LocalizeOrElse(nameof(ShaderVersionLabel), "Shader version");
         public static string SoftwareVersionLabel => LocalizeOrElse(nameof(SoftwareVersionLabel), "Software version");
         public static string SpoutLabel => LocalizeOrElse(nameof(SpoutLabel), "Spout");
         public static string SteamVrPlayspaceLabel => LocalizeOrElse(nameof(SteamVrPlayspaceLabel), "SteamVR playspace");
+        public static string TargetLabel => LocalizeOrElse(nameof(TargetLabel), "Target");
         public static string UseRightEyeLabel => LocalizeOrElse(nameof(UseRightEyeLabel), "Use right eye");
         public static string VrAnchorLabel => LocalizeOrElse(nameof(VrAnchorLabel), "VR Anchor");
         public static string VrOffsetLabel => LocalizeOrElse(nameof(VrOffsetLabel), "VR Offset");
@@ -51,6 +56,8 @@ public class LocalizationPhrase
         public static string MsgConnectToDeviceOnSerialPort => LocalizeOrElse(nameof(MsgConnectToDeviceOnSerialPort), "Connect to device on serial port {0}");
         public static string MsgDataNotInitialized => LocalizeOrElse(nameof(MsgDataNotInitialized), "Data not initialized");
         public static string MsgOpenVrUnavailable => LocalizeOrElse(nameof(MsgOpenVrUnavailable), "OpenVR is not running.");
+        public static string MsgProtocol1NoEntityData => LocalizeOrElse(nameof(MsgProtocol1NoEntityData), "Protocol 1 contains decoded Unity light data and does not contain entity records. See the Lights tab.");
+        public static string MsgProtocol2NoLightData => LocalizeOrElse(nameof(MsgProtocol2NoLightData), "Protocol 2 contains decoded entity data and does not contain Unity light data. See the Entities tab.");
         public static string MsgShaderDoesNotSupportCameraPosition => LocalizeOrElse(nameof(MsgShaderDoesNotSupportCameraPosition), "Detected shader version is {0}, which does not support camera position (minimum required: {1})");
         public static string MsgSpoutUnavailable => LocalizeOrElse(nameof(MsgSpoutUnavailable), "Spout is not yet available in this version of the software.");
         

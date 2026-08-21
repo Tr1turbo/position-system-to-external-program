@@ -152,7 +152,7 @@ public class UiMainApplication
         ShowDataWarningIfApplicable(data);
         if (data.validity == DataValidity.Ok)
         {
-            var interpreted = _uiActions.InterpretedData();
+            var interpreted = _uiActions.InterpretedTarget();
             if (interpreted.hasTarget)
             {
                 ImGui.SameLine();
@@ -263,12 +263,12 @@ public class UiMainApplication
             var extractedData = _uiActions.ExtractedData();
             if (extractedData.IsValid())
             {
-                var interpreted = _uiActions.InterpretedData();
+                var interpreted = _uiActions.InterpretedTarget();
                 ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.DebugLabel);
                 ImGui.Columns(2);
                 
                 ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.InterpretedDataLabel);
-                InterpretedDebug(interpreted);
+                TargetDebug(interpreted);
                 
                 ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.DataLabel);
                 DrawSieve(16, 101);
@@ -297,79 +297,11 @@ public class UiMainApplication
         _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.DebugLabel, () =>
         {
             ImGui.BeginTabBar("##tabs_debug");
-            _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.LightsLabel, () =>
-            {
-                var interpreted = _uiActions.InterpretedData();
-                var valid = data.validity == DataValidity.Ok;
-        
-                ShowDataWarningIfApplicable(data);
-                
-                if (!valid) ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1, 0, 0, 1));
-                for (var index = 0; index < data.Lights.Length; index++)
-                {
-                    var decodedLight = data.Lights[index];
-                    ImGui.SeparatorText($"Light #{index + 1}");
-                    ImGui.BeginDisabled(!decodedLight.enabled);
-                    ImGui.Text($"Enabled: {BoolToString(decodedLight.enabled)}");
-                    ImGui.Text($"Range: {decodedLight.range}");
-                    ImGui.Text($"Color: {decodedLight.color.X} {decodedLight.color.Y} {decodedLight.color.Z}");
-                    ImGui.Text($"Intensity: {decodedLight.intensity}");
-                    ImGui.Text($"Position: {decodedLight.position.X} {decodedLight.position.Y} {decodedLight.position.Z}");
-                    ImGui.EndDisabled();
-                }
-                if (!valid) ImGui.PopStyleColor();
-                
-                ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.InterpretedDataLabel);
-                InterpretedDebug(interpreted);
-            });
-            _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.CameraLabel, () =>
-            {
-                var extractedData = _uiActions.ExtractedData();
-                if (extractedData.IsValid())
-                {
-                    var decodedData = _uiActions.Data();
-                    if (decodedData.Version < 1_001_000)
-                    {
-                        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1, 0, 1, 1));
-                        ImGui.Text(string.Format(LocalizationPhrase.MainLocalizationPhrase.MsgShaderDoesNotSupportCameraPosition, decodedData.AsSemverString(), "1.1.0"));
-                        ImGui.PopStyleColor();
-                        ImGui.NewLine();
-                    }
-
-                    ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraPositionLabel} X: {decodedData.CameraPosition.X}");
-                    ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraPositionLabel} Y: {decodedData.CameraPosition.Y}");
-                    ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraPositionLabel} Z: {decodedData.CameraPosition.Z}");
-                    ImGui.NewLine();
-                    if (decodedData.Version == ShaderV2_0_0.Version)
-                    {
-                        ImGui.Text($"Presence mask: 0x{decodedData.PresenceMask:X8}");
-                        ImGui.Text($"Camera Euler available: {BoolToString(decodedData.CameraEulerAvailable)}");
-                        ImGui.Text($"Camera Euler ZXY: ({decodedData.CameraRotation.X}, {decodedData.CameraRotation.Y}, {decodedData.CameraRotation.Z})");
-                        EntityDebug("Entity 0", decodedData.Entity0);
-                        EntityDebug("Entity 1", decodedData.Entity1);
-                    }
-                    else
-                    {
-                        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} X: {decodedData.CameraRotation.X}");
-                        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} Y: {decodedData.CameraRotation.Y}");
-                        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} Z: {decodedData.CameraRotation.Z}");
-                    }
-                    ImGui.NewLine();
-                    ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.SteamVrPlayspaceLabel);
-                    ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.EstimatedScaleLabel}: {_uiActions.VirtualScale()}");
-                }
-            });
-            _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.DataLabel, () =>
-            {
-                var extractedData = _uiActions.ExtractedData();
-                if (extractedData.IsValid())
-                {
-                    var decodedData = _uiActions.Data();
-                    ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.ShaderVersionLabel}: {decodedData.AsSemverString()}");
-                    DrawSieve(32);
-                    ImGui.NewLine();
-                }
-            });
+            _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.LightsLabel, () => DrawLightsTab(data));
+            _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.EntitiesLabel, () => DrawEntitiesTab(data));
+            _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.TargetLabel, () => DrawTargetTab());
+            _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.CameraLabel, () => DrawCameraTab(data));
+            _scrollManager.MakeTab(LocalizationPhrase.MainLocalizationPhrase.DataLabel, () => DrawDataTab());
             ImGui.EndTabBar();
         });
 
@@ -414,20 +346,126 @@ public class UiMainApplication
         return anyChanged;
     }
 
-    private static void InterpretedDebug(InterpretedLightData interpreted)
+    private void DrawLightsTab(DecodedData data)
     {
-        ImGui.Text($"HasTarget: {BoolToString(interpreted.hasTarget)}");
-        ImGui.Text($"HasNormal: {BoolToString(interpreted.hasNormal)}");
-        var interpretedType = interpreted.isHole ? "hole" : interpreted.isRing ? "ring" : "undefined";
+        if (ShaderProtocols.IsProtocol2(data.Version))
+        {
+            ImGui.Text(LocalizationPhrase.MainLocalizationPhrase.MsgProtocol2NoLightData);
+            return;
+        }
+
+        var valid = data.validity == DataValidity.Ok;
+        if (!valid) ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1, 0, 0, 1));
+        for (var index = 0; index < data.Lights.Length; index++)
+        {
+            var decodedLight = data.Lights[index];
+            ImGui.SeparatorText($"Light #{index + 1}");
+            ImGui.BeginDisabled(!decodedLight.enabled);
+            ImGui.Text($"Enabled: {BoolToString(decodedLight.enabled)}");
+            ImGui.Text($"Position available: {BoolToString(decodedLight.positionAvailable)}");
+            ImGui.Text($"Position: {decodedLight.position.X} {decodedLight.position.Y} {decodedLight.position.Z}");
+            ImGui.Text($"Color available: {BoolToString(decodedLight.colorAvailable)}");
+            ImGui.Text($"Color: {decodedLight.color.X} {decodedLight.color.Y} {decodedLight.color.Z}");
+            ImGui.Text($"Intensity: {decodedLight.intensity}");
+            ImGui.Text($"Range available: {BoolToString(decodedLight.rangeAvailable)}");
+            ImGui.Text($"Range: {decodedLight.range}");
+            ImGui.EndDisabled();
+        }
+        if (!valid) ImGui.PopStyleColor();
+    }
+
+    private void DrawEntitiesTab(DecodedData data)
+    {
+        if (data.validity != DataValidity.Ok)
+        {
+            ShowDataWarningIfApplicable(data);
+            return;
+        }
+        if (!ShaderProtocols.IsProtocol2(data.Version))
+        {
+            ImGui.Text(LocalizationPhrase.MainLocalizationPhrase.MsgProtocol1NoEntityData);
+            return;
+        }
+
+        var interpreted = _uiActions.InterpretedTarget();
+        ImGui.Text($"Presence mask: 0x{data.PresenceMask:X8}");
+        if (!interpreted.hasTarget)
+        {
+            ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.SelectedTargetLabel}: {LocalizationPhrase.MainLocalizationPhrase.NoneLabel}");
+        }
+        for (var slot = 0; slot < data.Entities.Length; slot++)
+        {
+            EntityDebug($"Entity {slot}", data.Entities[slot]);
+            var selected = interpreted.hasSourceEntitySlot && interpreted.sourceEntitySlot == slot;
+            ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.SelectedForRoboticsLabel}: {BoolToString(selected)}");
+        }
+    }
+
+    private void DrawTargetTab()
+    {
+        ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.TargetLabel);
+        TargetDebug(_uiActions.InterpretedTarget());
+    }
+
+    private void DrawCameraTab(DecodedData data)
+    {
+        if (data.validity != DataValidity.Ok)
+        {
+            ShowDataWarningIfApplicable(data);
+            return;
+        }
+        if (!ShaderProtocols.SupportsCameraPosition(data.Version))
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1, 0, 1, 1));
+            ImGui.Text(string.Format(LocalizationPhrase.MainLocalizationPhrase.MsgShaderDoesNotSupportCameraPosition, data.AsSemverString(), "1.1.0"));
+            ImGui.PopStyleColor();
+            ImGui.NewLine();
+        }
+
+        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraPositionLabel} X: {data.CameraPosition.X}");
+        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraPositionLabel} Y: {data.CameraPosition.Y}");
+        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraPositionLabel} Z: {data.CameraPosition.Z}");
+        ImGui.Text($"Camera position available: {BoolToString(data.CameraPositionAvailable)}");
+        ImGui.NewLine();
+        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} X: {data.CameraRotation.X}");
+        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} Y: {data.CameraRotation.Y}");
+        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} Z: {data.CameraRotation.Z}");
+        ImGui.Text($"Camera Euler available: {BoolToString(data.CameraEulerAvailable)}");
+        ImGui.NewLine();
+        ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.SteamVrPlayspaceLabel);
+        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.EstimatedScaleLabel}: {_uiActions.VirtualScale()}");
+    }
+
+    private void DrawDataTab()
+    {
+        var extractedData = _uiActions.ExtractedData();
+        if (extractedData.IsValid())
+        {
+            var decodedData = _uiActions.Data();
+            ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.ShaderVersionLabel}: {decodedData.AsSemverString()}");
+            DrawSieve(32);
+            ImGui.NewLine();
+        }
+    }
+
+    private static void TargetDebug(InterpretedTargetData target)
+    {
+        ImGui.Text($"HasTarget: {BoolToString(target.hasTarget)}");
+        ImGui.Text($"HasNormal: {BoolToString(target.hasNormal)}");
+        var interpretedType = target.isHole ? "hole" : target.isRing ? "ring" : "undefined";
         ImGui.Text($"Type: {interpretedType}");
-        ImGui.Text($"Position: {interpreted.position.X} {interpreted.position.Y} {interpreted.position.Z}");
-        ImGui.Text($"Normal: {interpreted.normal.X} {interpreted.normal.Y} {interpreted.normal.Z}");
-        ImGui.Text($"HasTangent: {BoolToString(interpreted.hasTangent)}");
-        ImGui.Text($"Tangent: {interpreted.tangent.X} {interpreted.tangent.Y} {interpreted.tangent.Z}");
-        ImGui.Text($"HasSocketIdentity: {BoolToString(interpreted.hasSocketIdentity)}");
-        ImGui.Text($"SocketIdentity: 0x{interpreted.socketIdentity:X8}");
-        ImGui.Text($"HasSocketWorldScale: {BoolToString(interpreted.hasSocketWorldScale)}");
-        ImGui.Text($"SocketWorldScale: {interpreted.socketWorldScale}");
+        ImGui.Text($"Position: {target.position.X} {target.position.Y} {target.position.Z}");
+        ImGui.Text($"Normal: {target.normal.X} {target.normal.Y} {target.normal.Z}");
+        ImGui.Text($"HasTangent: {BoolToString(target.hasTangent)}");
+        ImGui.Text($"Tangent: {target.tangent.X} {target.tangent.Y} {target.tangent.Z}");
+        ImGui.Text($"HasSocketIdentity: {BoolToString(target.hasSocketIdentity)}");
+        ImGui.Text($"SocketIdentity: 0x{target.socketIdentity:X8}");
+        ImGui.Text($"HasSocketWorldScale: {BoolToString(target.hasSocketWorldScale)}");
+        ImGui.Text($"SocketWorldScale: {target.socketWorldScale}");
+        if (target.hasSourceEntitySlot)
+        {
+            ImGui.Text($"Source entity slot: {target.sourceEntitySlot}");
+        }
     }
 
     private static void EntityDebug(string label, DecodedEntity entity)
@@ -484,7 +522,7 @@ public class UiMainApplication
             if (numberOfLines == (int)ShaderV1_1_0.NumberOfLines)
             {
                 ImGui.SameLine();
-                var wordName = data.Version == ShaderV2_0_0.Version
+                var wordName = ShaderProtocols.IsProtocol2(data.Version)
                     ? Protocol2WordName(row)
                     : Enum.GetName(typeof(ShaderV1_1_0), row);
                 ImGui.Text("  ->   " + wordName);
