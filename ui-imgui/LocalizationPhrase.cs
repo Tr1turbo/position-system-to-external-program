@@ -46,7 +46,7 @@ public class LocalizationPhrase
         
         public static string MsgChecksumInvalid => LocalizeOrElse(nameof(MsgChecksumInvalid), "Checksum is failing");
         public static string MsgChecksumOk => LocalizeOrElse(nameof(MsgChecksumOk), "Data is OK");
-        public static string MsgChecksumUnexpectedMajorVersion => LocalizeOrElse(nameof(MsgChecksumUnexpectedMajorVersion), "Unexpected major version");
+        public static string MsgChecksumUnexpectedMajorVersion => LocalizeOrElse(nameof(MsgChecksumUnexpectedMajorVersion), "Unexpected protocol version");
         public static string MsgChecksumUnexpectedVendor => LocalizeOrElse(nameof(MsgChecksumUnexpectedVendor), "Unexpected vendor");
         public static string MsgConnectToDeviceOnSerialPort => LocalizeOrElse(nameof(MsgConnectToDeviceOnSerialPort), "Connect to device on serial port {0}");
         public static string MsgDataNotInitialized => LocalizeOrElse(nameof(MsgDataNotInitialized), "Data not initialized");

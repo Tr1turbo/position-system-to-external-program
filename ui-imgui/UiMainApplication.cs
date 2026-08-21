@@ -340,9 +340,20 @@ public class UiMainApplication
                     ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraPositionLabel} Y: {decodedData.CameraPosition.Y}");
                     ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraPositionLabel} Z: {decodedData.CameraPosition.Z}");
                     ImGui.NewLine();
-                    ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} X: {decodedData.CameraRotation.X}");
-                    ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} Y: {decodedData.CameraRotation.Y}");
-                    ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} Z: {decodedData.CameraRotation.Z}");
+                    if (decodedData.Version == ShaderV2_0_0.Version)
+                    {
+                        ImGui.Text($"Presence mask: 0x{decodedData.PresenceMask:X8}");
+                        ImGui.Text($"Camera Euler available: {BoolToString(decodedData.CameraEulerAvailable)}");
+                        ImGui.Text($"Camera Euler ZXY: ({decodedData.CameraRotation.X}, {decodedData.CameraRotation.Y}, {decodedData.CameraRotation.Z})");
+                        EntityDebug("Entity 0", decodedData.Entity0);
+                        EntityDebug("Entity 1", decodedData.Entity1);
+                    }
+                    else
+                    {
+                        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} X: {decodedData.CameraRotation.X}");
+                        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} Y: {decodedData.CameraRotation.Y}");
+                        ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.CameraRotationLabel} Z: {decodedData.CameraRotation.Z}");
+                    }
                     ImGui.NewLine();
                     ImGui.SeparatorText(LocalizationPhrase.MainLocalizationPhrase.SteamVrPlayspaceLabel);
                     ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.EstimatedScaleLabel}: {_uiActions.VirtualScale()}");
@@ -419,6 +430,23 @@ public class UiMainApplication
         ImGui.Text($"SocketWorldScale: {interpreted.socketWorldScale}");
     }
 
+    private static void EntityDebug(string label, DecodedEntity entity)
+    {
+        ImGui.SeparatorText(label);
+        ImGui.Text($"Present: {BoolToString(entity.Present)}");
+        ImGui.Text($"Descriptor: 0x{entity.RawDescriptor:X8} ({entity.SourceKind}, {entity.EntityKind})");
+        ImGui.Text($"Descriptor known: {BoolToString(entity.DescriptorKnown)}");
+        ImGui.Text($"Owner ID: {(entity.OwnerIdentityAvailable ? $"0x{entity.OwnerIdentity:X8}" : "N/A")}");
+        ImGui.Text($"Entity ID: {(entity.EntityIdentityAvailable ? $"0x{entity.EntityIdentity:X8}" : "N/A")}");
+        ImGui.Text($"Position: ({entity.Position.X}, {entity.Position.Y}, {entity.Position.Z})");
+        ImGui.Text($"Forward available: {BoolToString(entity.ForwardAvailable)}");
+        ImGui.Text($"Forward: ({entity.Forward.X}, {entity.Forward.Y}, {entity.Forward.Z})");
+        ImGui.Text($"Up available: {BoolToString(entity.UpAvailable)}");
+        ImGui.Text($"Up: ({entity.Up.X}, {entity.Up.Y}, {entity.Up.Z})");
+        ImGui.Text($"Scale: {entity.Scale} ({(entity.ScaleAvailable ? "source" : "default")})");
+        ImGui.Text($"Reserved words zero: {BoolToString(entity.ReservedWordsZero)}");
+    }
+
     private static string BoolToString(bool b)
     {
         return b ? "true" : "false";
@@ -453,14 +481,31 @@ public class UiMainApplication
                     ImGui.SameLine();
                 }
             }
-            if (numberOfLines == (int)ShaderV1_2_0.NumberOfLines)
+            if (numberOfLines == (int)ShaderV1_1_0.NumberOfLines)
             {
                 ImGui.SameLine();
-                var layoutType = data.Version >= 1_002_000 ? typeof(ShaderV1_2_0) : typeof(ShaderV1_1_0);
-                ImGui.Text("  ->   " + Enum.GetName(layoutType, row));
+                var wordName = data.Version == ShaderV2_0_0.Version
+                    ? Protocol2WordName(row)
+                    : Enum.GetName(typeof(ShaderV1_1_0), row);
+                ImGui.Text("  ->   " + wordName);
             }
         }
         if (!valid) ImGui.PopStyleColor();
+    }
+
+    private static string Protocol2WordName(int word)
+    {
+        if (word == 0) return "Checksum";
+        if (word == 1) return "Time";
+        if (word == 2) return "Identifier";
+        if (word == 3) return "Version";
+        if (word == 4) return "PresenceMask";
+        if (word is >= 5 and <= 7) return $"CameraPosition{(char)('X' + word - 5)}";
+        if (word is >= 8 and <= 10) return $"CameraEuler{(char)('X' + word - 8)}";
+        if (word is >= 11 and <= 26) return $"Entity0[{word - 11}]";
+        if (word is >= 27 and <= 42) return $"Entity1[{word - 27}]";
+        if (word is >= 43 and <= 50) return $"Reserved{word}";
+        return word == 51 ? "Canary" : string.Empty;
     }
 
     private static void ShowDataWarningIfApplicable(DecodedData data)
@@ -481,8 +526,11 @@ public class UiMainApplication
             case DataValidity.UnexpectedVendor:
                 ImGui.Text(LocalizationPhrase.MainLocalizationPhrase.MsgChecksumUnexpectedVendor);
                 break;
-            case DataValidity.UnexpectedMajorVersion:
+            case DataValidity.UnexpectedVersion:
                 ImGui.Text(LocalizationPhrase.MainLocalizationPhrase.MsgChecksumUnexpectedMajorVersion);
+                break;
+            case DataValidity.InvalidPayload:
+                ImGui.Text("Shader data payload is malformed.");
                 break;
             default:
                 throw new ArgumentOutOfRangeException();

@@ -34,7 +34,7 @@
     "MainLocalizationPhrase__label_WindowOffsetLabel": "Window Offset",
     "MainLocalizationPhrase__label_MsgChecksumInvalid": "Checksum is failing",
     "MainLocalizationPhrase__label_MsgChecksumOk": "Data is OK",
-    "MainLocalizationPhrase__label_MsgChecksumUnexpectedMajorVersion": "Unexpected major version",
+    "MainLocalizationPhrase__label_MsgChecksumUnexpectedMajorVersion": "Unexpected protocol version",
     "MainLocalizationPhrase__label_MsgChecksumUnexpectedVendor": "Unexpected vendor",
     "MainLocalizationPhrase__label_MsgConnectToDeviceOnSerialPort": "Connect to device on serial port {0}",
     "MainLocalizationPhrase__label_MsgDataNotInitialized": "Data not initialized",

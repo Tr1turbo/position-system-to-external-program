@@ -34,7 +34,7 @@
     "MainLocalizationPhrase__label_WindowOffsetLabel": "視窗偏移",
     "MainLocalizationPhrase__label_MsgChecksumInvalid": "檢查碼驗證失敗",
     "MainLocalizationPhrase__label_MsgChecksumOk": "資料正常",
-    "MainLocalizationPhrase__label_MsgChecksumUnexpectedMajorVersion": "意外的主要版本",
+    "MainLocalizationPhrase__label_MsgChecksumUnexpectedMajorVersion": "非預期的協定版本",
     "MainLocalizationPhrase__label_MsgChecksumUnexpectedVendor": "意外的供應商",
     "MainLocalizationPhrase__label_MsgConnectToDeviceOnSerialPort": "連接到序列埠 {0} 上的裝置",
     "MainLocalizationPhrase__label_MsgDataNotInitialized": "資料未初始化",
