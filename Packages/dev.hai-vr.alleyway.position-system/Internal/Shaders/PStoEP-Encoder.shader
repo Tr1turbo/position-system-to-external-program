@@ -19,7 +19,7 @@ Shader "Hai/PositionSystemToExternalProgram-Encoder"
             Cull Off
 
             CGPROGRAM
-            #define PSTOEP_PROTOCOL_VERSION 1001001u
+            #define PSTOEP_PROTOCOL_VERSION 2000000u
             #include "PStoEP-Light.cginc"
             #include "PStoEP-EncoderCore.cginc"
             ENDCG

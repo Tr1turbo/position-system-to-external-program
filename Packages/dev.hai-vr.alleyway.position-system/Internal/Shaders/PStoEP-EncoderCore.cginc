@@ -32,6 +32,7 @@ struct v2f
 float _EncodedSquareSize;
 float _IsTestScript;
 uniform float _VRChatCameraMode;
+uniform float _VRChatMirrorMode;
 
 // -----------------------------------------------------------------------------------------------------------------
 // [[ BEGIN THIRD PARTY SECTION -- LICENSE ONLY APPLIES TO THIS SECTION ]]
@@ -74,6 +75,10 @@ bool isRightEye()
 
 bool isMirror()
 {
+    // VRChat sets _VRChatMirrorMode on its mirror camera passes. The oblique-projection
+    // check below does not detect VRChat's mirror, so without this clip VRChat's mirror
+    // pass re-draws the encoded data over the HMD draw's encoded data.
+    if (_VRChatMirrorMode != 0.0) return true;
     // https://github.com/cnlohr/shadertrixx/blob/main/README.md#are-you-in-a-mirror
     return unity_CameraProjection[2][0] != 0.0 || unity_CameraProjection[2][1] != 0.0;
 }
@@ -86,12 +91,12 @@ static const uint CANARY = 1431677610u;
 static const int GROUP_Time = 1;
 static const int GROUP_VendorCheck = 2;
 static const int GROUP_VersionSemver = 3;
-static const int GROUP_LightPositionStart = 4;
-static const int GROUP_LightColorStart = 16;
-static const int GROUP_LightAttenuationStart = 32;
-static const int GROUP_CameraPositionStart = 36;
-static const int GROUP_CameraRotationStart = 39;
-static const int GROUP_ExtensionStart = 42;
+static const int GROUP_PresenceMask = 4;
+static const int GROUP_CameraPositionStart = 5;
+static const int GROUP_CameraEulerStart = 8;
+static const int GROUP_Entity0Start = 11;
+static const int GROUP_Entity1Start = 27;
+static const int GROUP_ReservedStart = 43;
 static const int GROUP_Canary = 51;
 static const int GROUP_LENGTH = 52;
 
@@ -103,7 +108,7 @@ static const int MARGIN = 1;
 static const float GrayLevel = 0.5;
 static const uint CRC32_POLYNOMIAL = 0xEDB88320u;
 
-float3 GetUnityEulerAngles(float3x3 rotMatrix)
+float3 PStoEP_GetUnityEulerAngles(float3x3 rotMatrix)
 {
     float3 euler;
     float sinX = clamp(rotMatrix[1][2], -1.0, 1.0);
@@ -119,11 +124,18 @@ float3 GetUnityEulerAngles(float3x3 rotMatrix)
         euler.z = 0.0;
     }
     euler = degrees(euler);
-    // The matrix-to-Euler conversion above still needs this correction to match
-    // Unity's reported camera orientation. Keep this explicit until it is replaced
-    // with a conversion that produces Unity's convention directly.
     euler.y -= 180.0;
     return euler;
+}
+
+uint PStoEP_PresenceMask(PSTOEP_PROVIDER_CONTEXT_TYPE context)
+{
+    uint mask = context.entity0.fields;
+    mask |= context.entity1.fields << 6u;
+    if (PStoEP_IsFinite3(_WorldSpaceCameraPos)) mask |= 1u << 12u;
+    float3 cameraEuler = PStoEP_GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
+    if (PStoEP_IsFinite3(cameraEuler)) mask |= 1u << 13u;
+    return mask;
 }
 
 uint NthBit(uint value, uint bit)
@@ -135,44 +147,27 @@ uint getData(int wordIndex, PSTOEP_PROVIDER_CONTEXT_TYPE providerContext)
 {
     if (wordIndex < GROUP_Time) return 0u;
     if (wordIndex < GROUP_VendorCheck) return asuint((float)_Time);
-    // Vendor and version are integers. Casting either to float would lose bits.
     if (wordIndex < GROUP_VersionSemver) return VENDOR;
-    if (wordIndex < GROUP_LightPositionStart) return VERSION;
-    if (wordIndex < GROUP_LightColorStart)
+    if (wordIndex < GROUP_PresenceMask) return VERSION;
+    if (wordIndex < GROUP_CameraPositionStart) return PStoEP_PresenceMask(providerContext);
+    if (wordIndex < GROUP_CameraEulerStart)
     {
-        // lightWordOffset is an integer in [0, 11].
-        uint lightWordOffset = (uint)(wordIndex - GROUP_LightPositionStart);
-        uint lightIndex = lightWordOffset / 3u; // floor(lightWordOffset / 3.0)
-        uint componentIndex = lightWordOffset - lightIndex * 3u; // glsl_mod(lightWordOffset, 3)
-        float3 position = PSTOEP_PROVIDER_LIGHT_POSITION((int)lightIndex, providerContext);
-        return asuint(position[componentIndex]);
+        return PStoEP_IsFinite3(_WorldSpaceCameraPos)
+            ? asuint(_WorldSpaceCameraPos[wordIndex - GROUP_CameraPositionStart])
+            : PSTOEP_CANONICAL_NAN;
     }
-    if (wordIndex < GROUP_LightAttenuationStart)
+    if (wordIndex < GROUP_Entity0Start)
     {
-        uint colorWordOffset = (uint)(wordIndex - GROUP_LightColorStart);
-        // colorWordOffset is an integer in [0, 15].
-        uint lightIndex = colorWordOffset >> 2u; // floor(colorWordOffset / 4.0)
-        uint componentIndex = colorWordOffset & 3u; // glsl_mod(colorWordOffset, 4)
-        float4 color = PSTOEP_PROVIDER_LIGHT_COLOR((int)lightIndex, providerContext);
-        return asuint(color[componentIndex]);
+        float3 euler = PStoEP_GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
+        return PStoEP_IsFinite3(euler)
+            ? asuint(euler[wordIndex - GROUP_CameraEulerStart])
+            : PSTOEP_CANONICAL_NAN;
     }
-    if (wordIndex < GROUP_CameraPositionStart)
-    {
-        return asuint(PSTOEP_PROVIDER_LIGHT_ATTENUATION(
-            wordIndex - GROUP_LightAttenuationStart,
-            providerContext
-        ));
-    }
-    if (wordIndex < GROUP_CameraRotationStart)
-    {
-        return asuint(_WorldSpaceCameraPos[wordIndex - GROUP_CameraPositionStart]);
-    }
-    if (wordIndex < GROUP_ExtensionStart)
-    {
-        float3 euler = GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
-        return asuint(euler[wordIndex - GROUP_CameraRotationStart]);
-    }
-    if (wordIndex < GROUP_Canary) return PSTOEP_PROVIDER_EXTENSION_DATA(wordIndex, providerContext);
+    if (wordIndex < GROUP_Entity1Start)
+        return PStoEP_EntityWord(providerContext.entity0, (uint)(wordIndex - GROUP_Entity0Start));
+    if (wordIndex < GROUP_ReservedStart)
+        return PStoEP_EntityWord(providerContext.entity1, (uint)(wordIndex - GROUP_Entity1Start));
+    if (wordIndex < GROUP_Canary) return 0u;
     if (wordIndex < GROUP_LENGTH) return CANARY;
     return 0u;
 }
@@ -244,11 +239,11 @@ fixed4 frag(v2f input) : SV_Target
     PSTOEP_PROVIDER_CONTEXT_TYPE providerContext = PSTOEP_PROVIDER_CONTEXT_FROM_INPUT(input);
 
     #if defined(USING_STEREO_MATRICES)
-        // Only the left eye carries the packet.
+        // Only the left eye carries the encoded data.
         if (isRightEye()) clip(-1);
     #else
         // Square desktop renders are usually avatar thumbnails or other cameras
-        // where the packet should not be exposed. VR handheld cameras are allowed.
+        // where the encoded data should not be exposed. VR handheld cameras are allowed.
         if (_VRChatCameraMode != 1 && _ScreenParams.x == _ScreenParams.y) clip(-1);
     #endif
     if (isMirror()) clip(-1);
@@ -257,7 +252,7 @@ fixed4 frag(v2f input) : SV_Target
         (GROUP_LENGTH * (float)SERIALIZE_BitsPerWord) / SERIALIZE_NumberOfColumns
     );
     // Black margins prevent neighboring scene pixels from contaminating samples.
-    // Packet pixels deliberately use GrayLevel instead of full white to limit bloom.
+    // Encoded pixels deliberately use GrayLevel instead of full white to limit bloom.
     // The decoder also expects brightness to vary because transparency or other
     // shader effects can still draw over this screen region in some worlds.
     if (input.uv.x < 0 || input.uv.x >= SERIALIZE_NumberOfColumns

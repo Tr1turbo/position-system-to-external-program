@@ -16,13 +16,13 @@ public class DecodedData
     public DecodedLight[] Lights { get; }
     public Vector3 CameraPosition;
     public Vector3 CameraRotation;
+    public bool CameraPositionAvailable;
+    public bool CameraEulerAvailable;
 
-    public bool Sps2TargetAvailable;
-    public uint Sps2SocketIdentity;
-    public Vector3 Normal;
-    public Vector3 Tangent;
-    public uint Sps2SocketFlags;
-    public float Sps2WorldScale;
+    public uint PresenceMask;
+    public DecodedEntity Entity0 { get; } = new();
+    public DecodedEntity Entity1 { get; } = new();
+    public DecodedEntity[] Entities { get; }
 
     public string AsSemverString()
     {
@@ -35,6 +35,58 @@ public class DecodedData
     public DecodedData()
     {
         Lights = new [] { Light0, Light1, Light2, Light3 };
+        Entities = new[] { Entity0, Entity1 };
+    }
+}
+
+public class DecodedEntity
+{
+    public bool Present;
+    public uint RawDescriptor;
+    public PositionSystemSourceKind SourceKind;
+    public PositionSystemEntityKind EntityKind;
+    public bool DescriptorKnown;
+
+    public bool OwnerIdentityAvailable;
+    public uint OwnerIdentity;
+    public bool EntityIdentityAvailable;
+    public uint EntityIdentity;
+
+    public Vector3 Position;
+    public bool ForwardAvailable;
+    public Vector3 Forward;
+    public bool UpAvailable;
+    public Vector3 Up;
+    public Quaternion Rotation = Quaternion.Identity;
+
+    public bool ScaleAvailable;
+    public float Scale = float.NaN;
+    public bool ReservedWordsZero = true;
+
+    public bool IsSocketLike => EntityKind is PositionSystemEntityKind.Hole
+        or PositionSystemEntityKind.Ring
+        or PositionSystemEntityKind.OneWayRing;
+
+    public void Clear()
+    {
+        Present = false;
+        RawDescriptor = 0;
+        SourceKind = PositionSystemSourceKind.Unknown;
+        EntityKind = PositionSystemEntityKind.Unknown;
+        DescriptorKnown = false;
+        OwnerIdentityAvailable = false;
+        OwnerIdentity = 0;
+        EntityIdentityAvailable = false;
+        EntityIdentity = 0;
+        Position = Vector3.Zero;
+        ForwardAvailable = false;
+        Forward = Vector3.Zero;
+        UpAvailable = false;
+        Up = Vector3.Zero;
+        Rotation = Quaternion.Identity;
+        ScaleAvailable = false;
+        Scale = float.NaN;
+        ReservedWordsZero = true;
     }
 }
 
@@ -44,7 +96,8 @@ public enum DataValidity
     Ok,
     InvalidChecksum,
     UnexpectedVendor,
-    UnexpectedMajorVersion,
+    UnexpectedVersion,
+    InvalidPayload,
 }
     
 public class DecodedLight

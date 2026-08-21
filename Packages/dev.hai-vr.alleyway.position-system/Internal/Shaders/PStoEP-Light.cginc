@@ -1,96 +1,172 @@
 #ifndef PSTOEP_LIGHT_INCLUDED
 #define PSTOEP_LIGHT_INCLUDED
 
-#include "UnityCG.cginc"
+#include "PStoEP-Protocol2.cginc"
 
-static const float PSTOEP_LIGHT_RANGE_HOLE = 0.41;
-static const float PSTOEP_LIGHT_RANGE_RING = 0.42;
-static const float PSTOEP_LIGHT_RANGE_TOLERANCE = 0.005;
+static const float PSTOEP_LIGHT_PAIR_DISTANCE_SQ = 0.09;
+
+struct PStoEPProviderContext
+{
+    PStoEPEntity entity0;
+    PStoEPEntity entity1;
+};
 
 float3 PStoEP_LightWorldPosition(int index)
 {
     return float3(unity_4LightPosX0[index], unity_4LightPosY0[index], unity_4LightPosZ0[index]);
 }
 
-float3 PStoEP_LightLocalPosition(int index)
+float PStoEP_LightRange(int index)
 {
-    return mul(unity_WorldToObject, float4(PStoEP_LightWorldPosition(index), 1)).xyz;
+    float attenuation = unity_4LightAtten0[index];
+    return attenuation > 0.0 ? 5.0 * rsqrt(attenuation) : 1.0;
 }
 
-float4 PStoEP_LightColor(int index)
+bool PStoEP_LightIsBlack(int index)
 {
-    return unity_LightColor[index];
+    float4 color = unity_LightColor[index];
+    return color.a > 0.0 && all(color.rgb == 0.0);
 }
 
-float PStoEP_LightAttenuation(int index)
+uint PStoEP_LightSuffix(int index)
 {
-    return unity_4LightAtten0[index];
+    float range = PStoEP_LightRange(index);
+    float millibase = floor(range * 1000.0 + 1.0e-4) * 0.001;
+    return (uint)round((range - millibase) * 10000.0);
 }
 
-float PStoEP_LightDecodedRange(int index)
+uint PStoEP_LightSourceKind(int index)
 {
-    float attenuation = PStoEP_LightAttenuation(index);
-    float range = 1.0;
-    if (attenuation > 0.0 && attenuation <= 1000000.0)
-    {
-        range = 0.005 * sqrt(1000000.0 - attenuation) / sqrt(attenuation);
-    }
-    return range;
+    uint suffix = PStoEP_LightSuffix(index);
+    if (suffix == 2u) return PSTOEP_SOURCE_CLASSIC_SPS1_LIGHT;
+    if (suffix >= 5u && suffix <= 7u) return PSTOEP_SOURCE_SPS2_COMPATIBILITY_LIGHT;
+    return PSTOEP_SOURCE_CLASSIC_LIGHT;
 }
 
-bool PStoEP_LightIsSps2CompatibilityMarker(int index)
+uint PStoEP_LightChannel(int index)
 {
-    // VRCFury gives the real black compatibility lights emitted beside an
-    // SPS2 atlas socket a range suffix of .0005 through .0007. They remain
-    // valid raw light data, but must not become independent legacy candidates
-    // and compete with the authoritative SPS2 socket that emitted them.
-    float attenuation = PStoEP_LightAttenuation(index);
-    if (attenuation <= 0.0) return false;
-
-    // Use Unity's direct point-light range decode for this exact marker test,
-    // matching VRCFury. The historical desktop range reconstruction above is
-    // intentionally retained for ordinary legacy socket classification.
-    float range = 5.0 * rsqrt(attenuation);
-    int secondDecimal = (int)round(fmod(range, 0.1) * 100.0);
-    if (secondDecimal != 1 && secondDecimal != 2 && secondDecimal != 5) return false;
-
-    float fourthDecimal = fmod(range, 0.001) * 10000.0;
-    return fourthDecimal >= 5.0 && fourthDecimal <= 7.0;
+    float range = PStoEP_LightRange(index);
+    return (uint)round(fmod(range, 0.1) * 100.0);
 }
 
-bool PStoEP_LightIsLegacySocketRoot(int index)
+bool PStoEP_LightIsFront(int index)
 {
-    float4 color = PStoEP_LightColor(index);
-    if (color.a <= 0.0 || any(color.rgb != 0.0)) return false;
-
-    float range = PStoEP_LightDecodedRange(index);
-    if (PStoEP_LightIsSps2CompatibilityMarker(index)) return false;
-
-    return abs(range - PSTOEP_LIGHT_RANGE_HOLE) < PSTOEP_LIGHT_RANGE_TOLERANCE
-        || abs(range - PSTOEP_LIGHT_RANGE_RING) < PSTOEP_LIGHT_RANGE_TOLERANCE;
+    if (!PStoEP_LightIsBlack(index)) return false;
+    uint channel = PStoEP_LightChannel(index);
+    return channel == 5u || channel == 6u;
 }
 
-float PStoEP_NearestLegacySocketDistanceSq(float3 observerWorld)
+uint PStoEP_LightEntityKind(int index)
 {
+    if (!PStoEP_LightIsBlack(index)) return PSTOEP_ENTITY_UNKNOWN;
+    float range = PStoEP_LightRange(index);
+    if (!PStoEP_IsFinite(range) || range >= 0.5) return PSTOEP_ENTITY_UNKNOWN;
+    uint channel = PStoEP_LightChannel(index);
+    if (channel == 1u || channel == 3u) return PSTOEP_ENTITY_HOLE;
+    if (channel != 2u && channel != 4u) return PSTOEP_ENTITY_UNKNOWN;
+    return PStoEP_LightSourceKind(index) == PSTOEP_SOURCE_CLASSIC_LIGHT
+        ? PSTOEP_ENTITY_ONE_WAY_RING
+        : PSTOEP_ENTITY_RING;
+}
+
+PStoEPEntity PStoEP_FindNearestClassicSocket(float3 observerWorld, bool excludeSps2Compatibility)
+{
+    PStoEPEntity best = PStoEP_InvalidEntity();
     float bestDistanceSq = 3.402823466e+38;
     [unroll]
-    for (int lightIndex = 0; lightIndex < 4; lightIndex++)
+    for (int rootIndex = 0; rootIndex < 4; rootIndex++)
     {
-        if (!PStoEP_LightIsLegacySocketRoot(lightIndex)) continue;
+        uint entityKind = PStoEP_LightEntityKind(rootIndex);
+        if (entityKind == PSTOEP_ENTITY_UNKNOWN) continue;
+        uint sourceKind = PStoEP_LightSourceKind(rootIndex);
+        if (excludeSps2Compatibility && sourceKind == PSTOEP_SOURCE_SPS2_COMPATIBILITY_LIGHT) continue;
+        uint expectedFrontChannel = PStoEP_LightChannel(rootIndex) <= 2u ? 5u : 6u;
 
-        float3 offset = PStoEP_LightWorldPosition(lightIndex) - observerWorld;
-        bestDistanceSq = min(bestDistanceSq, dot(offset, offset));
+        float3 rootWorld = PStoEP_LightWorldPosition(rootIndex);
+        float3 observerOffset = rootWorld - observerWorld;
+        float distanceSq = dot(observerOffset, observerOffset);
+        if (distanceSq >= bestDistanceSq) continue;
+
+        float bestFrontDistanceSq = PSTOEP_LIGHT_PAIR_DISTANCE_SQ;
+        float3 forwardLocal = PStoEP_NaN3();
+        [unroll]
+        for (int frontIndex = 0; frontIndex < 4; frontIndex++)
+        {
+            if (!PStoEP_LightIsFront(frontIndex)) continue;
+            if (PStoEP_LightChannel(frontIndex) != expectedFrontChannel) continue;
+            if (PStoEP_LightSourceKind(frontIndex) != sourceKind) continue;
+            float3 rootToFrontWorld = PStoEP_LightWorldPosition(frontIndex) - rootWorld;
+            float pairDistanceSq = dot(rootToFrontWorld, rootToFrontWorld);
+            if (pairDistanceSq >= bestFrontDistanceSq) continue;
+            bestFrontDistanceSq = pairDistanceSq;
+            forwardLocal = mul((float3x3)unity_WorldToObject, rootToFrontWorld);
+        }
+
+        best = PStoEP_MakeForwardEntity(
+            PStoEP_Descriptor(sourceKind, entityKind),
+            mul(unity_WorldToObject, float4(rootWorld, 1.0)).xyz,
+            forwardLocal);
+        bestDistanceSq = distanceSq;
     }
-    return bestDistanceSq;
+    return best;
 }
 
-#define PSTOEP_PROVIDER_V2F_FIELDS
-#define PSTOEP_PROVIDER_VERTEX_PREPARE(output)
-#define PSTOEP_PROVIDER_CONTEXT_TYPE uint
-#define PSTOEP_PROVIDER_CONTEXT_FROM_INPUT(input) 0u
-#define PSTOEP_PROVIDER_LIGHT_POSITION(index, context) PStoEP_LightLocalPosition(index)
-#define PSTOEP_PROVIDER_LIGHT_COLOR(index, context) PStoEP_LightColor(index)
-#define PSTOEP_PROVIDER_LIGHT_ATTENUATION(index, context) PStoEP_LightAttenuation(index)
-#define PSTOEP_PROVIDER_EXTENSION_DATA(wordIndex, context) 0u
+PStoEPProviderContext PStoEP_LightProviderContext()
+{
+    PStoEPProviderContext context;
+    float3 observerWorld = mul(unity_ObjectToWorld, float4(0, 0, 0, 1)).xyz;
+    context.entity0 = PStoEP_FindNearestClassicSocket(observerWorld, false);
+    context.entity1 = PStoEP_InvalidEntity();
+    return context;
+}
+
+#define PSTOEP_PROVIDER_V2F_FIELDS \
+    nointerpolation uint4 pstoepEntity0Info : TEXCOORD1; \
+    nointerpolation uint3 pstoepEntity0Position : TEXCOORD2; \
+    nointerpolation uint4 pstoepEntity0Orientation : TEXCOORD3; \
+    nointerpolation uint pstoepEntity0Scale : TEXCOORD4; \
+    nointerpolation uint4 pstoepEntity1Info : TEXCOORD5; \
+    nointerpolation uint3 pstoepEntity1Position : TEXCOORD6; \
+    nointerpolation uint4 pstoepEntity1Orientation : TEXCOORD7; \
+    nointerpolation uint pstoepEntity1Scale : TEXCOORD8;
+
+#define PSTOEP_WRITE_ENTITY(output, prefix, entity) \
+    output.prefix##Info = uint4(entity.descriptor, entity.ownerIdentity, entity.entityIdentity, entity.fields); \
+    output.prefix##Position = entity.position; \
+    output.prefix##Orientation = entity.orientation; \
+    output.prefix##Scale = entity.scale;
+
+#define PSTOEP_PROVIDER_VERTEX_PREPARE(output) \
+    PStoEPProviderContext pstoepVertexContext = PStoEP_LightProviderContext(); \
+    PSTOEP_WRITE_ENTITY(output, pstoepEntity0, pstoepVertexContext.entity0) \
+    PSTOEP_WRITE_ENTITY(output, pstoepEntity1, pstoepVertexContext.entity1)
+
+PStoEPEntity PStoEP_ReadEntity(uint4 info, uint3 position, uint4 orientation, uint scale)
+{
+    PStoEPEntity entity;
+    entity.descriptor = info.x;
+    entity.ownerIdentity = info.y;
+    entity.entityIdentity = info.z;
+    entity.fields = info.w;
+    entity.position = position;
+    entity.orientation = orientation;
+    entity.scale = scale;
+    return entity;
+}
+
+PStoEPProviderContext PStoEP_ProviderContextFromFields(
+    uint4 entity0Info, uint3 entity0Position, uint4 entity0Orientation, uint entity0Scale,
+    uint4 entity1Info, uint3 entity1Position, uint4 entity1Orientation, uint entity1Scale)
+{
+    PStoEPProviderContext context;
+    context.entity0 = PStoEP_ReadEntity(entity0Info, entity0Position, entity0Orientation, entity0Scale);
+    context.entity1 = PStoEP_ReadEntity(entity1Info, entity1Position, entity1Orientation, entity1Scale);
+    return context;
+}
+
+#define PSTOEP_PROVIDER_CONTEXT_TYPE PStoEPProviderContext
+#define PSTOEP_PROVIDER_CONTEXT_FROM_INPUT(input) PStoEP_ProviderContextFromFields( \
+    input.pstoepEntity0Info, input.pstoepEntity0Position, input.pstoepEntity0Orientation, input.pstoepEntity0Scale, \
+    input.pstoepEntity1Info, input.pstoepEntity1Position, input.pstoepEntity1Orientation, input.pstoepEntity1Scale)
 
 #endif

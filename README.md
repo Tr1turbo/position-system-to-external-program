@@ -1,4 +1,4 @@
-﻿Position System to External Program
+Position System to External Program
 ====
 
 *Position System to External Program* is a **prefab** and a **program** that lets you connect the position of standard DPS-like lights
@@ -102,7 +102,87 @@ By default, the shader outputs:
 On the program side, we use [Otsu's method](https://en.wikipedia.org/wiki/Otsu%27s_method) on the red channel to choose a threshold
 so that the decoding process would function even when post-processing significantly dims the entire screen.
 
-### Shader version 1.1.0
+### Shader protocol 2.0.0
+
+Protocol 2 converts all shader sources into the same entity records. Classic DPS/SPS1 lights and SPS2 atlas cells therefore share one data layout; consumers do not need separate position/orientation fields for each source. The data is still exactly 52 IEEE 754/binary32 words, and the CRC-32 still covers words 1 through 51.
+
+| Words | Field |
+|-------|-------|
+| **0** | CRC-32 of words 1 through 51. |
+| **1** | Unity time (`_Time.y`) as float32. |
+| **2** | Position System protocol identifier `1366692562`. |
+| **3** | Protocol 2 version `2000000` (2.0.0). |
+| **4** | Presence mask described below. |
+| **5-7** | Camera world position `(x, y, z)`. |
+| **8-10** | Camera world Euler angles `(x, y, z)` in degrees, using Unity's ZXY rotation order. |
+| **11-26** | Protocol 2 entity slot 0. The encoder normally places the nearest eligible socket here. |
+| **27-42** | Protocol 2 entity slot 1. The SPS2 encoder normally places the nearest atlas plug here. |
+| **43-50** | Reserved; must be zero. |
+| **51** | Canary `1431677610`. |
+
+Each entity slot is 16 words:
+
+| Offset | Field |
+|--------|-------|
+| **+0** | Descriptor: entity kind in bits 0-7, source kind in bits 8-15, bits 16-31 zero. |
+| **+1** | Owner/player identity. This is opaque protocol data. |
+| **+2** | Entity identity. This is opaque protocol data. |
+| **+3 to +5** | Position `(x, y, z)` in the encoder renderer's local space. |
+| **+6 to +9** | Orientation, using one of the representations below. |
+| **+10** | Scalar world scale. |
+| **+11 to +15** | Reserved; must be zero. |
+
+Source kinds are `0 = Unknown`, `1 = ClassicLight`, `2 = ClassicSps1Light`, `3 = Sps2CompatibilityLight`, and `4 = Sps2Atlas`. Entity kinds are `0 = Unknown`, `1 = Hole`, `2 = Ring`, `3 = OneWayRing`, and `16 = Plug`. Unknown descriptors remain available for diagnostics but are not selected as robotics targets.
+
+The descriptor intentionally contains both source and entity kind. Entity kind defines behavior, while source kind records how the entity record was produced. A plug does not need a separate target kind: it uses the same record and frame conventions as a socket, with entity kind `Plug`.
+
+Presence-mask bits are grouped by slot:
+
+| Bit | Meaning |
+|-----|---------|
+| **0-5** | Slot 0: present, owner ID, entity ID, forward, up/full quaternion, explicit scale. |
+| **6-11** | Slot 1: the same six flags in the same order. |
+| **12** | Camera position is present. |
+| **13** | Camera Euler rotation is present. |
+| **14-31** | Reserved; must be zero. |
+
+Orientation always reserves four words:
+
+- No orientation: all four words are canonical quiet NaN (`0x7FC00000`).
+- Forward only: words +6 to +8 are normalized forward `(x, y, z)` and word +9 is canonical NaN. The forward bit is set and the up bit is clear.
+- Full frame: words +6 to +9 are a normalized quaternion `(x, y, z, w)`. Both forward and up bits are set. Quaternion `w` is not reconstructed or omitted.
+
+The Protocol 2 frame uses local `+Z` as forward and local `+Y` as up. The desktop's existing socket interpretation maps this to `normal = -forward` and `tangent = up`.
+
+Canonical NaN means absent or invalid data. An absent/invalid slot encodes NaN for position, orientation, and scale. A valid record whose source simply does not define scale encodes `1.0` with the explicit-scale bit clear. If a source supplied a malformed scale, the entity position remains valid but scale is canonical NaN with the explicit-scale bit clear. A valid record with no orientation likewise keeps its position and scale, but encodes canonical NaN in all four orientation words. Non-finite or degenerate position data invalidates the entity; malformed optional orientation or scale data is not forwarded.
+
+The default encoder policy is:
+
+1. Slot 0 contains the nearest eligible socket.
+2. Slot 1 contains the nearest SPS2 atlas plug.
+
+The wire format itself is generic and permits any pair of entities. The desktop retains both slots, but its current robotics adapter selects the nearest known socket-like entity and ignores plugs as motion targets. Ties prefer the lower slot number.
+
+Classic light decoding preserves both established DPS root/front channels: root channels 1/2 pair with front channel 5, while root channels 3/4 pair with front channel 6. Producer family is classified from the light-range suffix: ordinary DPS/classic ranges are `ClassicLight`, suffix `.0002` is `ClassicSps1Light`, and suffixes `.0005` through `.0007` are `Sps2CompatibilityLight`. Roots pair only with front markers from the same source family, and the existing maximum root/front distance is retained. Ordinary DPS rings map to one-sided `OneWayRing`; SPS1 double-sided ring compatibility data maps to `Ring`.
+
+The ordinary encoder permits all three light families. The SPS2 atlas encoder permits `ClassicLight`, `ClassicSps1Light`, and `Sps2Atlas`, but excludes `Sps2CompatibilityLight` roots and fronts so compatibility lights cannot compete with their authoritative atlas socket or provide orientation to another family. The nearest eligible socket wins; an exact tie may prefer the richer atlas record.
+
+SPS2 socket flags map as follows:
+
+| SPS2 Hole | SPS2 DoubleSided | Entity kind |
+|-----------|------------------|-------------|
+| 1 | 0 | `Hole` |
+| 0 | 1 | `Ring` |
+| 0 | 0 | `OneWayRing` |
+| 1 | 1 | Invalid/ambiguous; rejected |
+
+Other SPS2 target flags are not serialized because they do not change the Protocol 2 position frame used by this application.
+
+The desktop accepts the Protocol 1 version family (`1_xxx_xxx`, including upstream's `1_001_001` and the earlier SPS2 `1_002_000`) and Protocol 2 version `2_000_000`. Protocol 1 retains its original four-light and camera-Euler layout unchanged; Protocol 2 is emitted by the updated Unity encoders. The SPS2 shader reads VRCFury's installed SPS2 includes and atlas; those files are not copied into this package. SPS2 atlas validation requires the supported VRCFury version and a Windows Direct3D environment. The ordinary encoder remains independent of VRCFury.
+
+The WebSocket service is a separate interpreted-input path and is unchanged by shader protocol 2.0.
+
+### Protocol 1 compatibility
 
 Adding new lines at the end is considered to be a breaking change because the checksum would change, and it would be vertically taller, compromising the vertical centering.
 This is why there is reserved space for future use. 
@@ -150,16 +230,8 @@ This is why there is reserved space for future use.
 | **38** | Position of the camera (z) in world space.                                                                                                                                                                                                               | \>=1.1.0 |
 | **39** | Euler angles of the camera (x) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
 | **40** | Euler angles of the camera (y) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
-| **41** | Euler angles of the camera (y) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
-| **42** | Nonzero opaque identifier for the selected SPS2 socket, derived from its player ID and unique ID. Zero means no validated SPS2 socket frame is available.                                                                                                | \>=1.2.0 |
-| **43** | Position System normal axis (x) in encoder-local space, equal to the negative SPS2 socket forward axis.                                                                                                                                                    | \>=1.2.0 |
-| **44** | Position System normal axis (y) in encoder-local space, equal to the negative SPS2 socket forward axis.                                                                                                                                                    | \>=1.2.0 |
-| **45** | Position System normal axis (z) in encoder-local space, equal to the negative SPS2 socket forward axis.                                                                                                                                                    | \>=1.2.0 |
-| **46** | Position System tangent axis (x) in encoder-local space, derived from the SPS2 socket frame-up axis.                                                                                                                                                       | \>=1.2.0 |
-| **47** | Position System tangent axis (y) in encoder-local space, derived from the SPS2 socket frame-up axis.                                                                                                                                                       | \>=1.2.0 |
-| **48** | Position System tangent axis (z) in encoder-local space, derived from the SPS2 socket frame-up axis.                                                                                                                                                       | \>=1.2.0 |
-| **49** | Selected SPS2 socket flags.                                                                                                                                                                                                                               | \>=1.2.0 |
-| **50** | Selected SPS2 socket scalar world scale.                                                                                                                                                                                                                  | \>=1.2.0 |
+| **41** | Euler angles of the camera (z) in world space, in degrees, using the ZXY rotation order (same as [Unity](https://docs.unity3d.com/ScriptReference/Quaternion.Euler.html)).                                                                               | \>=1.1.0 |
+| **42-50** | Reserved; zero. | 1.1.0 |
 | **51** | Canary. Equal to 1431677610, which results in a checkerboard pattern in binary. This is used to help solve alignment issues.<br/>This value can change in the future. The program will not check if this value is equal, but it is part of the checksum. |          |
 
 \* *The value of `unity_LightColor[3]` may be disrupted if the scene contains a directional light due to a Unity quirk, so this value may not be trusted to detect point lights.*
@@ -175,19 +247,11 @@ To do this, we calculate a CRC-32 hash in the shader that this program will chec
 
 If the check fails, we reuse the last known valid data.
 
-The CRC-32 hash is based on groups 1 to 51 (inclusive). Protocol 1.2 uses groups 42 to 50 for the SPS2 target frame:
-
-- 42 is a nonzero opaque identifier for the selected socket, derived from the SPS2 player ID and socket unique ID. Zero means that no validated SPS2 socket frame is available.
-- 43 to 45 contain the Position System normal axis, which is the negative of the selected socket's SPS2 forward axis.
-- 46 to 48 contain the Position System tangent axis, derived from the selected socket's SPS2 frame-up axis.
-- 49 contains the SPS2 socket flags.
-- 50 contains the selected socket's scalar world scale.
+The CRC-32 hash is based on groups 1 to 51 inclusive.
 
 ## SPS2 Integration
 
-The VRCFury prefab adds VRChat SPS2 socket support while preserving the established light-based fallback. It exports the
-selected socket frame through protocol 1.2 so the desktop application can interpret position, orientation(normal and tangent), identity, flags,
-and scale.
+The VRCFury prefab adds VRChat SPS2 socket and plug support while preserving classic DPS/SPS1 light input. The current encoder exports all recognized sources through the Protocol 2 entity slots described above.
 
 ### WebSockets as an alternative input system
 

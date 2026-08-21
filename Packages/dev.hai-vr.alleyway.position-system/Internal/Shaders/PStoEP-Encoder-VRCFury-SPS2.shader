@@ -20,7 +20,7 @@ Shader "Hai/PositionSystemToExternalProgram-Encoder-VRCFury-SPS2"
 
             CGPROGRAM
             #pragma exclude_renderers metal
-            #define PSTOEP_PROTOCOL_VERSION 1002000u
+            #define PSTOEP_PROTOCOL_VERSION 2000000u
             #include "PStoEP-Sps2.cginc"
             #include "PStoEP-EncoderCore.cginc"
             ENDCG
