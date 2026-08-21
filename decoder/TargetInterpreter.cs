@@ -61,6 +61,11 @@ public class TargetInterpreter
             isHole = entity.EntityKind == PositionSystemEntityKind.Hole,
             isRing = entity.EntityKind is PositionSystemEntityKind.Ring
                 or PositionSystemEntityKind.OneWayRing,
+            sourceKind = entity.SourceKind,
+            hasOwnerIdentity = entity.OwnerIdentityAvailable,
+            ownerIdentity = entity.OwnerIdentity,
+            hasEntityIdentity = entity.EntityIdentityAvailable,
+            entityIdentity = entity.EntityIdentity,
             hasSocketWorldScale = float.IsFinite(entity.Scale),
             socketWorldScale = float.IsFinite(entity.Scale) ? entity.Scale : 1f,
         };
@@ -75,25 +80,7 @@ public class TargetInterpreter
             interpreted.hasTangent = true;
             interpreted.tangent = entity.Up;
         }
-        if (entity.OwnerIdentityAvailable || entity.EntityIdentityAvailable)
-        {
-            interpreted.hasSocketIdentity = true;
-            interpreted.socketIdentity = HashIdentity(entity);
-        }
         return interpreted;
-    }
-
-    private static uint HashIdentity(DecodedEntity entity)
-    {
-        uint value = entity.RawDescriptor ^ 0x9e3779b9u;
-        value ^= entity.OwnerIdentity + 0x9e3779b9u + (value << 6) + (value >> 2);
-        value ^= entity.EntityIdentity + 0x9e3779b9u + (value << 6) + (value >> 2);
-        value ^= value >> 16;
-        value *= 0x7feb352du;
-        value ^= value >> 15;
-        value *= 0x846ca68bu;
-        value ^= value >> 16;
-        return value != 0u ? value : 1u;
     }
 
     private static InterpretedTargetData Interpret(DecodedLight[] decodedLights)
@@ -129,6 +116,7 @@ public class TargetInterpreter
                         normal = normal,
                         isHole = EncodesRange(our, LightRangeForHole),
                         isRing = EncodesRange(our, LightRangeForRing),
+                        sourceKind = InterpretLightSourceKind(our),
                     };
                 }
             }
@@ -139,6 +127,7 @@ public class TargetInterpreter
                 position = position,
                 isHole = EncodesRange(our, LightRangeForHole),
                 isRing = EncodesRange(our, LightRangeForRing),
+                sourceKind = InterpretLightSourceKind(our),
             };
         }
 
@@ -151,4 +140,15 @@ public class TargetInterpreter
     private static bool IsBlackLight(DecodedLight light) => light.color.X == 0f && light.color.Y == 0f && light.color.Z == 0f;
     private static bool EncodesRange(DecodedLight light, float encodedAmount) => light.enabled && MathF.Abs(light.range - encodedAmount) < 0.005f;
     private static float LocalPosSqrMagnitude(DecodedLight light) => Vector3.DistanceSquared(Vector3.Zero, light.position);
+    private static PositionSystemSourceKind InterpretLightSourceKind(DecodedLight light)
+    {
+        var millibase = MathF.Floor(light.range * 1000f + 0.0001f) * 0.001f;
+        var fourthDecimal = (int)MathF.Round((light.range - millibase) * 10000f);
+        return fourthDecimal switch
+        {
+            2 => PositionSystemSourceKind.ClassicSps1Light,
+            6 => PositionSystemSourceKind.Sps2CompatibilityLight,
+            _ => PositionSystemSourceKind.ClassicLight,
+        };
+    }
 }

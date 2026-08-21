@@ -68,8 +68,11 @@ public class RoboticsDriver
     private Vector3 _absoluteTwistReferenceNormal;
     private Vector3 _absoluteTwistReferenceFrameUp;
     private float _absoluteTwistReferenceCommandDegrees;
-    private bool _absoluteTwistReferenceHasSocketIdentity;
-    private uint _absoluteTwistReferenceSocketIdentity;
+    private PositionSystemSourceKind _absoluteTwistReferenceSourceKind;
+    private bool _absoluteTwistReferenceHasOwnerIdentity;
+    private uint _absoluteTwistReferenceOwnerIdentity;
+    private bool _absoluteTwistReferenceHasEntityIdentity;
+    private uint _absoluteTwistReferenceEntityIdentity;
     private float _absoluteTwistPreviousWrappedDegrees;
     private float _continuousTwistDegrees;
     private TwistLimitMappingState _twistLimitMappingState;
@@ -200,8 +203,11 @@ public class RoboticsDriver
                         _unsafeAngleDegR0 = UpdateAbsoluteTwist(
                             target.normal,
                             target.tangent,
-                            target.hasSocketIdentity,
-                            target.socketIdentity
+                            target.sourceKind,
+                            target.hasOwnerIdentity,
+                            target.ownerIdentity,
+                            target.hasEntityIdentity,
+                            target.entityIdentity
                         );
                     }
                     else
@@ -258,30 +264,55 @@ public class RoboticsDriver
     private float UpdateAbsoluteTwist(
         Vector3 normalUntrusted,
         Vector3 frameUpUntrusted,
-        bool hasSocketIdentity,
-        uint socketIdentity)
+        PositionSystemSourceKind sourceKind,
+        bool hasOwnerIdentity,
+        uint ownerIdentity,
+        bool hasEntityIdentity,
+        uint entityIdentity)
     {
         if (!TryCreateTwistFrame(normalUntrusted, frameUpUntrusted, out var normal, out var frameUp))
         {
             return _boundedTwistCommandDegrees;
         }
 
-        var socketChanged = _absoluteTwistReferenceInitialized && !IsSameSocketIdentity(
-            hasSocketIdentity,
-            socketIdentity,
-            _absoluteTwistReferenceHasSocketIdentity,
-            _absoluteTwistReferenceSocketIdentity
+        var socketChanged = _absoluteTwistReferenceInitialized && !IsSameTargetIdentity(
+            sourceKind,
+            hasOwnerIdentity,
+            ownerIdentity,
+            hasEntityIdentity,
+            entityIdentity,
+            _absoluteTwistReferenceSourceKind,
+            _absoluteTwistReferenceHasOwnerIdentity,
+            _absoluteTwistReferenceOwnerIdentity,
+            _absoluteTwistReferenceHasEntityIdentity,
+            _absoluteTwistReferenceEntityIdentity
         );
         if (!_absoluteTwistReferenceInitialized)
         {
-            RebaseAbsoluteTwist(normal, frameUp, hasSocketIdentity, socketIdentity);
+            RebaseAbsoluteTwist(
+                normal,
+                frameUp,
+                sourceKind,
+                hasOwnerIdentity,
+                ownerIdentity,
+                hasEntityIdentity,
+                entityIdentity
+            );
             return _boundedTwistCommandDegrees;
         }
 
         if (socketChanged)
         {
             ApplySocketTransitionPolicy();
-            RebaseAbsoluteTwist(normal, frameUp, hasSocketIdentity, socketIdentity);
+            RebaseAbsoluteTwist(
+                normal,
+                frameUp,
+                sourceKind,
+                hasOwnerIdentity,
+                ownerIdentity,
+                hasEntityIdentity,
+                entityIdentity
+            );
             return _boundedTwistCommandDegrees;
         }
 
@@ -424,14 +455,20 @@ public class RoboticsDriver
     private void RebaseAbsoluteTwist(
         Vector3 normal,
         Vector3 frameUp,
-        bool hasSocketIdentity,
-        uint socketIdentity)
+        PositionSystemSourceKind sourceKind,
+        bool hasOwnerIdentity,
+        uint ownerIdentity,
+        bool hasEntityIdentity,
+        uint entityIdentity)
     {
         _absoluteTwistReferenceNormal = normal;
         _absoluteTwistReferenceFrameUp = frameUp;
         _absoluteTwistReferenceCommandDegrees = _boundedTwistCommandDegrees;
-        _absoluteTwistReferenceHasSocketIdentity = hasSocketIdentity;
-        _absoluteTwistReferenceSocketIdentity = hasSocketIdentity ? socketIdentity : 0u;
+        _absoluteTwistReferenceSourceKind = sourceKind;
+        _absoluteTwistReferenceHasOwnerIdentity = hasOwnerIdentity;
+        _absoluteTwistReferenceOwnerIdentity = hasOwnerIdentity ? ownerIdentity : 0u;
+        _absoluteTwistReferenceHasEntityIdentity = hasEntityIdentity;
+        _absoluteTwistReferenceEntityIdentity = hasEntityIdentity ? entityIdentity : 0u;
         _absoluteTwistPreviousWrappedDegrees = 0f;
         _continuousTwistDegrees = 0f;
         _twistLimitMappingState = default;
@@ -451,14 +488,23 @@ public class RoboticsDriver
         ClearAbsoluteTwistReference();
     }
 
-    private static bool IsSameSocketIdentity(
-        bool firstHasIdentity,
-        uint firstIdentity,
-        bool secondHasIdentity,
-        uint secondIdentity)
+    private static bool IsSameTargetIdentity(
+        PositionSystemSourceKind firstSourceKind,
+        bool firstHasOwnerIdentity,
+        uint firstOwnerIdentity,
+        bool firstHasEntityIdentity,
+        uint firstEntityIdentity,
+        PositionSystemSourceKind secondSourceKind,
+        bool secondHasOwnerIdentity,
+        uint secondOwnerIdentity,
+        bool secondHasEntityIdentity,
+        uint secondEntityIdentity)
     {
-        return firstHasIdentity == secondHasIdentity
-            && (!firstHasIdentity || firstIdentity == secondIdentity);
+        return firstSourceKind == secondSourceKind
+            && firstHasOwnerIdentity == secondHasOwnerIdentity
+            && (!firstHasOwnerIdentity || firstOwnerIdentity == secondOwnerIdentity)
+            && firstHasEntityIdentity == secondHasEntityIdentity
+            && (!firstHasEntityIdentity || firstEntityIdentity == secondEntityIdentity);
     }
 
     private static bool TryCreateTwistFrame(
@@ -542,8 +588,11 @@ public class RoboticsDriver
     private void ClearAbsoluteTwistReference(float? commandDegrees = null)
     {
         _absoluteTwistReferenceInitialized = false;
-        _absoluteTwistReferenceHasSocketIdentity = false;
-        _absoluteTwistReferenceSocketIdentity = 0u;
+        _absoluteTwistReferenceSourceKind = PositionSystemSourceKind.Unknown;
+        _absoluteTwistReferenceHasOwnerIdentity = false;
+        _absoluteTwistReferenceOwnerIdentity = 0u;
+        _absoluteTwistReferenceHasEntityIdentity = false;
+        _absoluteTwistReferenceEntityIdentity = 0u;
         _absoluteTwistPreviousWrappedDegrees = 0f;
         _continuousTwistDegrees = 0f;
         _twistLimitMappingState = default;

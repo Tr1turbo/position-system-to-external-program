@@ -458,8 +458,9 @@ public class UiMainApplication
         ImGui.Text($"Normal: {target.normal.X} {target.normal.Y} {target.normal.Z}");
         ImGui.Text($"HasTangent: {BoolToString(target.hasTangent)}");
         ImGui.Text($"Tangent: {target.tangent.X} {target.tangent.Y} {target.tangent.Z}");
-        ImGui.Text($"HasSocketIdentity: {BoolToString(target.hasSocketIdentity)}");
-        ImGui.Text($"SocketIdentity: 0x{target.socketIdentity:X8}");
+        ImGui.Text($"Source kind: {target.sourceKind}");
+        ImGui.Text($"Owner ID: {(target.hasOwnerIdentity ? $"0x{target.ownerIdentity:X8}" : "N/A")}");
+        ImGui.Text($"Entity ID: {(target.hasEntityIdentity ? $"0x{target.entityIdentity:X8}" : "N/A")}");
         ImGui.Text($"HasSocketWorldScale: {BoolToString(target.hasSocketWorldScale)}");
         ImGui.Text($"SocketWorldScale: {target.socketWorldScale}");
         if (target.hasSourceEntitySlot)

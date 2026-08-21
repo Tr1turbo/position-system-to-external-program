@@ -15,8 +15,13 @@ public struct InterpretedTargetData
 
     public bool hasTangent;
     public Vector3 tangent;
-    public bool hasSocketIdentity;
-    public uint socketIdentity;
+
+    public PositionSystemSourceKind sourceKind;
+    public bool hasOwnerIdentity;
+    public uint ownerIdentity;
+    public bool hasEntityIdentity;
+    public uint entityIdentity;
+
     public bool hasSocketWorldScale;
     public float socketWorldScale;
 

@@ -132,7 +132,7 @@ Each entity slot is 16 words:
 | **+10** | Scalar world scale. |
 | **+11 to +15** | Reserved; must be zero. |
 
-Source kinds are `0 = Unknown`, `1 = ClassicLight`, `2 = ClassicSps1Light`, `3 = Sps2CompatibilityLight`, and `4 = Sps2Atlas`. Entity kinds are `0 = Unknown`, `1 = Hole`, `2 = Ring`, `3 = OneWayRing`, and `16 = Plug`. Unknown descriptors remain available for diagnostics but are not selected as robotics targets.
+Protocol 2 descriptor source kinds occupy bits 8-15, giving them a numeric range of `0` through `255`. Defined wire values are `0 = Unknown`, `1 = ClassicLight`, `2 = ClassicSps1Light`, `3 = Sps2CompatibilityLight`, and `4 = Sps2Atlas`. Entity kinds are `0 = Unknown`, `1 = Hole`, `2 = Ring`, `3 = OneWayRing`, and `16 = Plug`. Unknown descriptors remain available for diagnostics but are not selected as robotics targets. `255 = WebSocket` is reserved for interpreted input and is not valid in a Protocol 2 descriptor.
 
 The descriptor intentionally contains both source and entity kind. Entity kind defines behavior, while source kind records how the entity record was produced. A plug does not need a separate target kind: it uses the same record and frame conventions as a socket, with entity kind `Plug`.
 
@@ -153,6 +153,8 @@ Orientation always reserves four words:
 - Full frame: words +6 to +9 are a normalized quaternion `(x, y, z, w)`. Both forward and up bits are set. Quaternion `w` is not reconstructed or omitted.
 
 The Protocol 2 frame uses local `+Z` as forward and local `+Y` as up. The desktop's existing socket interpretation maps this to `normal = -forward` and `tangent = up`.
+
+The interpreted target retains its source kind and the owner/entity identities as separate values, including their individual presence flags. These values are not collapsed into the legacy Protocol 1.2 hashed socket identity. Protocol 1 reconstructs `ClassicLight`, `ClassicSps1Light`, or `Sps2CompatibilityLight` from the selected root light's full range. Direct interpreted input reports `WebSocket`. Protocol 1 and WebSocket targets have both identities absent.
 
 Canonical NaN means absent or invalid data. An absent/invalid slot encodes NaN for position, orientation, and scale. A valid record whose source simply does not define scale encodes `1.0` with the explicit-scale bit clear. If a source supplied a malformed scale, the entity position remains valid but scale is canonical NaN with the explicit-scale bit clear. A valid record with no orientation likewise keeps its position and scale, but encodes canonical NaN in all four orientation words. Non-finite or degenerate position data invalidates the entity; malformed optional orientation or scale data is not forwarded.
 

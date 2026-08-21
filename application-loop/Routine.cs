@@ -408,7 +408,8 @@ public class Routine
             tangent = tangentUntrustedNullable != null ? Vector3.Normalize(tangentUntrustedNullable.Value) : Vector3.Zero,
             hasTarget = true,
             hasNormal = true,
-            hasTangent = tangentUntrustedNullable != null
+            hasTangent = tangentUntrustedNullable != null,
+            sourceKind = PositionSystemSourceKind.WebSocket,
         };
         _directExtraction++;
     }

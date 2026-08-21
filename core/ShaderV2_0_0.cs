@@ -41,15 +41,6 @@ public static class ShaderV2_0_0
     public const uint DefinedPresenceMask = 0x00003fffu;
 }
 
-public enum PositionSystemSourceKind : byte
-{
-    Unknown = 0,
-    ClassicLight = 1,
-    ClassicSps1Light = 2,
-    Sps2CompatibilityLight = 3,
-    Sps2Atlas = 4,
-}
-
 public enum PositionSystemEntityKind : byte
 {
     Unknown = 0,
