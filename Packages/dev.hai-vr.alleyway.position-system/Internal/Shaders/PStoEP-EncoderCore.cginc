@@ -128,12 +128,11 @@ float3 PStoEP_GetUnityEulerAngles(float3x3 rotMatrix)
     return euler;
 }
 
-uint PStoEP_PresenceMask(PSTOEP_PROVIDER_CONTEXT_TYPE context)
+uint PStoEP_PresenceMask(PSTOEP_PROVIDER_CONTEXT_TYPE context, float3 cameraPos, float3 cameraEuler)
 {
     uint mask = context.entity0.fields;
     mask |= context.entity1.fields << 6u;
-    if (PStoEP_IsFinite3(_WorldSpaceCameraPos)) mask |= 1u << 12u;
-    float3 cameraEuler = PStoEP_GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
+    if (PStoEP_IsFinite3(cameraPos)) mask |= 1u << 12u;
     if (PStoEP_IsFinite3(cameraEuler)) mask |= 1u << 13u;
     return mask;
 }
@@ -143,24 +142,33 @@ uint NthBit(uint value, uint bit)
     return value & (1u << bit);
 }
 
-uint getData(int wordIndex, PSTOEP_PROVIDER_CONTEXT_TYPE providerContext)
+uint getData(int wordIndex, PSTOEP_PROVIDER_CONTEXT_TYPE providerContext, float3 cameraPos, float3 cameraEuler)
 {
     if (wordIndex < GROUP_Time) return 0u;
     if (wordIndex < GROUP_VendorCheck) return asuint((float)_Time);
     if (wordIndex < GROUP_VersionSemver) return VENDOR;
     if (wordIndex < GROUP_PresenceMask) return VERSION;
-    if (wordIndex < GROUP_CameraPositionStart) return PStoEP_PresenceMask(providerContext);
+    if (wordIndex < GROUP_CameraPositionStart) return PStoEP_PresenceMask(providerContext, cameraPos, cameraEuler);
     if (wordIndex < GROUP_CameraEulerStart)
     {
-        return PStoEP_IsFinite3(_WorldSpaceCameraPos)
-            ? asuint(_WorldSpaceCameraPos[wordIndex - GROUP_CameraPositionStart])
+        // Constant component access only: dynamic vector indexing of _WorldSpaceCameraPos
+        // makes the D3D11 compiler emit invalid bytecode under single-pass stereo.
+        uint component = (uint)(wordIndex - GROUP_CameraPositionStart);
+        float componentValue = component == 0u
+            ? cameraPos.x
+            : (component == 1u ? cameraPos.y : cameraPos.z);
+        return PStoEP_IsFinite3(cameraPos)
+            ? asuint(componentValue)
             : PSTOEP_CANONICAL_NAN;
     }
     if (wordIndex < GROUP_Entity0Start)
     {
-        float3 euler = PStoEP_GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
-        return PStoEP_IsFinite3(euler)
-            ? asuint(euler[wordIndex - GROUP_CameraEulerStart])
+        uint component = (uint)(wordIndex - GROUP_CameraEulerStart);
+        float componentValue = component == 0u
+            ? cameraEuler.x
+            : (component == 1u ? cameraEuler.y : cameraEuler.z);
+        return PStoEP_IsFinite3(cameraEuler)
+            ? asuint(componentValue)
             : PSTOEP_CANONICAL_NAN;
     }
     if (wordIndex < GROUP_Entity1Start)
@@ -238,6 +246,14 @@ fixed4 frag(v2f input) : SV_Target
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
     PSTOEP_PROVIDER_CONTEXT_TYPE providerContext = PSTOEP_PROVIDER_CONTEXT_FROM_INPUT(input);
 
+    // Read the camera position and orientation once here: under single-pass
+    // stereo, _WorldSpaceCameraPos and UNITY_MATRIX_I_V are eye-indexed
+    // cbuffer arrays, and reading them inside the unrolled CRC loop below
+    // makes the D3D11 compiler emit invalid bytecode (X8000 "temp register
+    // ... uninitialized").
+    float3 cameraPos = _WorldSpaceCameraPos;
+    float3 cameraEuler = PStoEP_GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
+
     #if defined(USING_STEREO_MATRICES)
         // Only the left eye carries the encoded data.
         if (isRightEye()) clip(-1);
@@ -275,13 +291,13 @@ fixed4 frag(v2f input) : SV_Target
         uint crc = 0xffffffffu;
         for (int word = GROUP_Time; word < GROUP_LENGTH; word++)
         {
-            crc = CRC32UpdateUint(crc, getData(word, providerContext));
+            crc = CRC32UpdateUint(crc, getData(word, providerContext, cameraPos, cameraEuler));
         }
         data = crc ^ 0xffffffffu;
     }
     else
     {
-        data = getData((int)wordIndex, providerContext);
+        data = getData((int)wordIndex, providerContext, cameraPos, cameraEuler);
     }
 
     return NthBit(data, bitIndex) != 0u

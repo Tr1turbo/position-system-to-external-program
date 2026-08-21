@@ -176,8 +176,23 @@ uint PStoEP_EntityWord(PStoEPEntity entity, uint offset)
     if (offset == 0u) return entity.descriptor;
     if (offset == 1u) return entity.ownerIdentity;
     if (offset == 2u) return entity.entityIdentity;
-    if (offset < 6u) return entity.position[offset - 3u];
-    if (offset < 10u) return entity.orientation[offset - 6u];
+    // Constant component access only: dynamic vector indexing (position[offset - 3u])
+    // makes the D3D11 compiler emit invalid bytecode in some stereo configurations.
+    if (offset < 6u)
+    {
+        uint component = offset - 3u;
+        if (component == 0u) return entity.position.x;
+        if (component == 1u) return entity.position.y;
+        return entity.position.z;
+    }
+    if (offset < 10u)
+    {
+        uint component = offset - 6u;
+        if (component == 0u) return entity.orientation.x;
+        if (component == 1u) return entity.orientation.y;
+        if (component == 2u) return entity.orientation.z;
+        return entity.orientation.w;
+    }
     if (offset == 10u) return entity.scale;
     return 0u;
 }
