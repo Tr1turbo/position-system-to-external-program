@@ -3,7 +3,7 @@
 
 #include "PStoEP-Protocol2.cginc"
 
-static const float PSTOEP_LIGHT_PAIR_DISTANCE_SQ = 0.09;
+static const float PSTOEP_LIGHT_PAIR_MAX_WORLD_DISTANCE_SQ = 0.09;
 
 struct PStoEPProviderContext
 {
@@ -28,7 +28,7 @@ bool PStoEP_LightIsBlack(int index)
     return color.a > 0.0 && all(color.rgb == 0.0);
 }
 
-uint PStoEP_LightSuffix(int index)
+uint PStoEP_LightFourthDecimal(int index)
 {
     float range = PStoEP_LightRange(index);
     float millibase = floor(range * 1000.0 + 1.0e-4) * 0.001;
@@ -37,13 +37,13 @@ uint PStoEP_LightSuffix(int index)
 
 uint PStoEP_LightSourceKind(int index)
 {
-    uint suffix = PStoEP_LightSuffix(index);
-    if (suffix == 2u) return PSTOEP_SOURCE_CLASSIC_SPS1_LIGHT;
-    if (suffix >= 5u && suffix <= 7u) return PSTOEP_SOURCE_SPS2_COMPATIBILITY_LIGHT;
+    uint fourthDecimal = PStoEP_LightFourthDecimal(index);
+    if (fourthDecimal == 2u) return PSTOEP_SOURCE_CLASSIC_SPS1_LIGHT;
+    if (fourthDecimal == 6u) return PSTOEP_SOURCE_SPS2_COMPATIBILITY_LIGHT;
     return PSTOEP_SOURCE_CLASSIC_LIGHT;
 }
 
-uint PStoEP_LightChannel(int index)
+uint PStoEP_LightRoundedHundredths(int index)
 {
     float range = PStoEP_LightRange(index);
     return (uint)round(fmod(range, 0.1) * 100.0);
@@ -52,19 +52,22 @@ uint PStoEP_LightChannel(int index)
 bool PStoEP_LightIsFront(int index)
 {
     if (!PStoEP_LightIsBlack(index)) return false;
-    uint channel = PStoEP_LightChannel(index);
-    return channel == 5u || channel == 6u;
+    float range = PStoEP_LightRange(index);
+    if (!PStoEP_IsFinite(range) || range < 0.4 || range >= 0.5) return false;
+    uint roundedHundredths = PStoEP_LightRoundedHundredths(index);
+    return roundedHundredths == 5u || roundedHundredths == 6u;
 }
 
 uint PStoEP_LightEntityKind(int index)
 {
     if (!PStoEP_LightIsBlack(index)) return PSTOEP_ENTITY_UNKNOWN;
     float range = PStoEP_LightRange(index);
-    if (!PStoEP_IsFinite(range) || range >= 0.5) return PSTOEP_ENTITY_UNKNOWN;
-    uint channel = PStoEP_LightChannel(index);
-    if (channel == 1u || channel == 3u) return PSTOEP_ENTITY_HOLE;
-    if (channel != 2u && channel != 4u) return PSTOEP_ENTITY_UNKNOWN;
-    return PStoEP_LightSourceKind(index) == PSTOEP_SOURCE_CLASSIC_LIGHT
+    if (!PStoEP_IsFinite(range) || range < 0.4 || range >= 0.5) return PSTOEP_ENTITY_UNKNOWN;
+    uint sourceKind = PStoEP_LightSourceKind(index);
+    uint roundedHundredths = PStoEP_LightRoundedHundredths(index);
+    if (roundedHundredths == 1u || roundedHundredths == 3u) return PSTOEP_ENTITY_HOLE;
+    if (roundedHundredths != 2u && roundedHundredths != 4u) return PSTOEP_ENTITY_UNKNOWN;
+    return sourceKind == PSTOEP_SOURCE_CLASSIC_LIGHT
         ? PSTOEP_ENTITY_ONE_WAY_RING
         : PSTOEP_ENTITY_RING;
 }
@@ -80,20 +83,22 @@ PStoEPEntity PStoEP_FindNearestClassicSocket(float3 observerWorld, bool excludeS
         if (entityKind == PSTOEP_ENTITY_UNKNOWN) continue;
         uint sourceKind = PStoEP_LightSourceKind(rootIndex);
         if (excludeSps2Compatibility && sourceKind == PSTOEP_SOURCE_SPS2_COMPATIBILITY_LIGHT) continue;
-        uint expectedFrontChannel = PStoEP_LightChannel(rootIndex) <= 2u ? 5u : 6u;
+        uint expectedFrontHundredths = PStoEP_LightRoundedHundredths(rootIndex) <= 2u ? 5u : 6u;
 
         float3 rootWorld = PStoEP_LightWorldPosition(rootIndex);
         float3 observerOffset = rootWorld - observerWorld;
         float distanceSq = dot(observerOffset, observerOffset);
         if (distanceSq >= bestDistanceSq) continue;
 
-        float bestFrontDistanceSq = PSTOEP_LIGHT_PAIR_DISTANCE_SQ;
+        // Pair markers by their physical world-space separation. Encoder or
+        // avatar object scale must not change this 0.3 metre limit.
+        float bestFrontDistanceSq = PSTOEP_LIGHT_PAIR_MAX_WORLD_DISTANCE_SQ;
         float3 forwardLocal = PStoEP_NaN3();
         [unroll]
         for (int frontIndex = 0; frontIndex < 4; frontIndex++)
         {
             if (!PStoEP_LightIsFront(frontIndex)) continue;
-            if (PStoEP_LightChannel(frontIndex) != expectedFrontChannel) continue;
+            if (PStoEP_LightRoundedHundredths(frontIndex) != expectedFrontHundredths) continue;
             if (PStoEP_LightSourceKind(frontIndex) != sourceKind) continue;
             float3 rootToFrontWorld = PStoEP_LightWorldPosition(frontIndex) - rootWorld;
             float pairDistanceSq = dot(rootToFrontWorld, rootToFrontWorld);

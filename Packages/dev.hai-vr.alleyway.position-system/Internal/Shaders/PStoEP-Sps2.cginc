@@ -115,9 +115,13 @@ PStoEPProviderContext PStoEP_Sps2ProviderContext()
 {
     PStoEPProviderContext context;
     float3 observerWorld = mul(unity_ObjectToWorld, float4(0, 0, 0, 1)).xyz;
-    context.entity0 = PStoEP_FindNearestClassicSocket(observerWorld, true);
     PStoEPSps2Candidate socket = PStoEP_FindNearestSps2(SPS_PRODUCT_SOCKET, observerWorld);
-    if ((socket.entity.fields & PSTOEP_FIELD_PRESENT) != 0u)
+    bool hasSps2Socket = (socket.entity.fields & PSTOEP_FIELD_PRESENT) != 0u;
+    // Compatibility lights are the legacy representation of an SPS2 socket.
+    // Keep them as fallback when no atlas socket is available, but exclude all
+    // of them once an authoritative atlas socket can represent the same target.
+    context.entity0 = PStoEP_FindNearestClassicSocket(observerWorld, hasSps2Socket);
+    if (hasSps2Socket)
     {
         float classicDistanceSq = 3.402823466e+38;
         if ((context.entity0.fields & PSTOEP_FIELD_PRESENT) != 0u)
