@@ -22,7 +22,7 @@
     "MainLocalizationPhrase__label_ResetToDefaultsLabel": "Reset to defaults",
     "MainLocalizationPhrase__label_RoboticsAdvancedLabel": "Robotics (Advanced)",
     "MainLocalizationPhrase__label_RoboticsLabel": "Robotics",
-    "MainLocalizationPhrase__label_SelectedForRoboticsLabel": "Selected for robotics",
+    "MainLocalizationPhrase__label_SelectedAsTargetLabel": "Selected as target",
     "MainLocalizationPhrase__label_SelectedTargetLabel": "Selected target",
     "MainLocalizationPhrase__label_ShaderVersionLabel": "Shader version",
     "MainLocalizationPhrase__label_SoftwareVersionLabel": "Software version",

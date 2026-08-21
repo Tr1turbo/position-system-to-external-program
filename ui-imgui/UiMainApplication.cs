@@ -156,13 +156,13 @@ public class UiMainApplication
             if (interpreted.hasTarget)
             {
                 ImGui.SameLine();
-                ImGui.Text("- Light found");
+                ImGui.Text("- Target found");
             }
             else
             {
                 ImGui.SameLine();
                 ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.5f, 0.5f, 0.5f, 1));
-                ImGui.Text("- Light not found");
+                ImGui.Text("- Target not found");
                 ImGui.PopStyleColor();
             }
         }
@@ -397,7 +397,7 @@ public class UiMainApplication
         {
             EntityDebug($"Entity {slot}", data.Entities[slot]);
             var selected = interpreted.hasSourceEntitySlot && interpreted.sourceEntitySlot == slot;
-            ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.SelectedForRoboticsLabel}: {BoolToString(selected)}");
+            ImGui.Text($"{LocalizationPhrase.MainLocalizationPhrase.SelectedAsTargetLabel}: {BoolToString(selected)}");
         }
     }
 
@@ -523,7 +523,7 @@ public class UiMainApplication
             {
                 ImGui.SameLine();
                 var wordName = ShaderProtocols.IsProtocol2(data.Version)
-                    ? Protocol2WordName(row)
+                    ? Protocol2WordName(row, data)
                     : Enum.GetName(typeof(ShaderV1_1_0), row);
                 ImGui.Text("  ->   " + wordName);
             }
@@ -531,7 +531,7 @@ public class UiMainApplication
         if (!valid) ImGui.PopStyleColor();
     }
 
-    private static string Protocol2WordName(int word)
+    private static string Protocol2WordName(int word, DecodedData data)
     {
         if (word == 0) return "Checksum";
         if (word == 1) return "Time";
@@ -540,10 +540,29 @@ public class UiMainApplication
         if (word == 4) return "PresenceMask";
         if (word is >= 5 and <= 7) return $"CameraPosition{(char)('X' + word - 5)}";
         if (word is >= 8 and <= 10) return $"CameraEuler{(char)('X' + word - 8)}";
-        if (word is >= 11 and <= 26) return $"Entity0[{word - 11}]";
-        if (word is >= 27 and <= 42) return $"Entity1[{word - 27}]";
-        if (word is >= 43 and <= 50) return $"Reserved{word}";
-        return word == 51 ? "Canary" : string.Empty;
+        if (word is >= ShaderV2_0_0.Entity0 and < ShaderV2_0_0.Entity1)
+            return EntityWordLabel(0, word - ShaderV2_0_0.Entity0, data.Entity0);
+        if (word is >= ShaderV2_0_0.Entity1 and < ShaderV2_0_0.ReservedStart)
+            return EntityWordLabel(1, word - ShaderV2_0_0.Entity1, data.Entity1);
+        if (word is >= ShaderV2_0_0.ReservedStart and <= ShaderV2_0_0.ReservedEnd) return $"Reserve{word}";
+        return word == ShaderV2_0_0.CanaryWord ? "Canary" : string.Empty;
+    }
+
+    private static string EntityWordLabel(int slot, int offset, DecodedEntity entity)
+    {
+        var name = $"Entity{slot}";
+        if (offset == 0) return $"{name}.Descriptor";
+        if (offset == 1) return $"{name}.OwnerIdentity";
+        if (offset == 2) return $"{name}.EntityIdentity";
+        if (offset is >= 3 and <= 5) return $"{name}.Position.{(char)('X' + offset - 3)}";
+        if (offset is >= 6 and <= 8) return entity.ForwardAvailable && !entity.UpAvailable
+            ? $"{name}.Forward.{(char)('X' + offset - 6)}"
+            : $"{name}.Quaternion.{(char)('X' + offset - 6)}";
+        if (offset == 9) return entity.ForwardAvailable && !entity.UpAvailable
+            ? $"{name}.Quaternion.Unused"
+            : $"{name}.Quaternion.W";
+        if (offset == 10) return $"{name}.Scale";
+        return $"{name}.Reserve{offset - ShaderV2_0_0.EntityReservedOffset}";
     }
 
     private static void ShowDataWarningIfApplicable(DecodedData data)

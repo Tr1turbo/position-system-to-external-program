@@ -22,7 +22,7 @@
     "MainLocalizationPhrase__label_ResetToDefaultsLabel": "重設為預設值",
     "MainLocalizationPhrase__label_RoboticsAdvancedLabel": "機器人學（進階）",
     "MainLocalizationPhrase__label_RoboticsLabel": "機器人學",
-    "MainLocalizationPhrase__label_SelectedForRoboticsLabel": "已選取用於機器人學",
+    "MainLocalizationPhrase__label_SelectedAsTargetLabel": "已選取為目標",
     "MainLocalizationPhrase__label_SelectedTargetLabel": "已選取的目標",
     "MainLocalizationPhrase__label_ShaderVersionLabel": "著色器版本",
     "MainLocalizationPhrase__label_SoftwareVersionLabel": "軟體版本",

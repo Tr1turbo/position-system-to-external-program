@@ -33,7 +33,7 @@ public class LocalizationPhrase
         public static string ResetToDefaultsLabel => LocalizeOrElse(nameof(ResetToDefaultsLabel), "Reset to defaults");
         public static string RoboticsAdvancedLabel => LocalizeOrElse(nameof(RoboticsAdvancedLabel), "Robotics (Advanced)");
         public static string RoboticsLabel => LocalizeOrElse(nameof(RoboticsLabel), "Robotics");
-        public static string SelectedForRoboticsLabel => LocalizeOrElse(nameof(SelectedForRoboticsLabel), "Selected for robotics");
+        public static string SelectedAsTargetLabel => LocalizeOrElse(nameof(SelectedAsTargetLabel), "Selected as target");
         public static string SelectedTargetLabel => LocalizeOrElse(nameof(SelectedTargetLabel), "Selected target");
         public static string ShaderVersionLabel => LocalizeOrElse(nameof(ShaderVersionLabel), "Shader version");
         public static string SoftwareVersionLabel => LocalizeOrElse(nameof(SoftwareVersionLabel), "Software version");
