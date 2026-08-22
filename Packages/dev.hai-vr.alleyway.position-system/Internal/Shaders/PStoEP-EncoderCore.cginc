@@ -25,6 +25,9 @@ struct v2f
     float2 uv : TEXCOORD0;
     float4 vertex : SV_POSITION;
     PSTOEP_PROVIDER_V2F_FIELDS
+    nointerpolation uint4 pstoepCameraPosition : TEXCOORD9;
+    nointerpolation uint4 pstoepCameraEuler : TEXCOORD10;
+    nointerpolation uint2 pstoepPacketInfo : TEXCOORD11;
     UNITY_VERTEX_INPUT_INSTANCE_ID
     UNITY_VERTEX_OUTPUT_STEREO
 };
@@ -128,12 +131,21 @@ float3 PStoEP_GetUnityEulerAngles(float3x3 rotMatrix)
     return euler;
 }
 
-uint PStoEP_PresenceMask(PSTOEP_PROVIDER_CONTEXT_TYPE context, float3 cameraPos, float3 cameraEuler)
+uint4 PStoEP_SerializeCameraVector(float3 value, uint presenceBit)
+{
+    if (PStoEP_IsFinite3(value)) return uint4(asuint(value), presenceBit);
+    return uint4(PSTOEP_CANONICAL_NAN, PSTOEP_CANONICAL_NAN, PSTOEP_CANONICAL_NAN, 0u);
+}
+
+uint PStoEP_PresenceMask(
+    PSTOEP_PROVIDER_CONTEXT_TYPE context,
+    uint4 cameraPosition,
+    uint4 cameraEuler)
 {
     uint mask = context.entity0.fields;
     mask |= context.entity1.fields << 6u;
-    if (PStoEP_IsFinite3(cameraPos)) mask |= 1u << 12u;
-    if (PStoEP_IsFinite3(cameraEuler)) mask |= 1u << 13u;
+    mask |= cameraPosition.w;
+    mask |= cameraEuler.w;
     return mask;
 }
 
@@ -142,34 +154,32 @@ uint NthBit(uint value, uint bit)
     return value & (1u << bit);
 }
 
-uint getData(int wordIndex, PSTOEP_PROVIDER_CONTEXT_TYPE providerContext, float3 cameraPos, float3 cameraEuler)
+uint PStoEP_GetData(
+    int wordIndex,
+    PSTOEP_PROVIDER_CONTEXT_TYPE providerContext,
+    uint timeWord,
+    uint4 cameraPosition,
+    uint4 cameraEuler)
 {
     if (wordIndex < GROUP_Time) return 0u;
-    if (wordIndex < GROUP_VendorCheck) return asuint((float)_Time);
+    if (wordIndex < GROUP_VendorCheck) return timeWord;
     if (wordIndex < GROUP_VersionSemver) return VENDOR;
     if (wordIndex < GROUP_PresenceMask) return VERSION;
-    if (wordIndex < GROUP_CameraPositionStart) return PStoEP_PresenceMask(providerContext, cameraPos, cameraEuler);
+    if (wordIndex < GROUP_CameraPositionStart)
+        return PStoEP_PresenceMask(providerContext, cameraPosition, cameraEuler);
     if (wordIndex < GROUP_CameraEulerStart)
     {
-        // Constant component access only: dynamic vector indexing of _WorldSpaceCameraPos
-        // makes the D3D11 compiler emit invalid bytecode under single-pass stereo.
         uint component = (uint)(wordIndex - GROUP_CameraPositionStart);
-        float componentValue = component == 0u
-            ? cameraPos.x
-            : (component == 1u ? cameraPos.y : cameraPos.z);
-        return PStoEP_IsFinite3(cameraPos)
-            ? asuint(componentValue)
-            : PSTOEP_CANONICAL_NAN;
+        if (component == 0u) return cameraPosition.x;
+        if (component == 1u) return cameraPosition.y;
+        return cameraPosition.z;
     }
     if (wordIndex < GROUP_Entity0Start)
     {
         uint component = (uint)(wordIndex - GROUP_CameraEulerStart);
-        float componentValue = component == 0u
-            ? cameraEuler.x
-            : (component == 1u ? cameraEuler.y : cameraEuler.z);
-        return PStoEP_IsFinite3(cameraEuler)
-            ? asuint(componentValue)
-            : PSTOEP_CANONICAL_NAN;
+        if (component == 0u) return cameraEuler.x;
+        if (component == 1u) return cameraEuler.y;
+        return cameraEuler.z;
     }
     if (wordIndex < GROUP_Entity1Start)
         return PStoEP_EntityWord(providerContext.entity0, (uint)(wordIndex - GROUP_Entity0Start));
@@ -198,6 +208,23 @@ uint CRC32UpdateUint(uint crc, uint value)
     crc = CRC32UpdateByte(crc, (value >> 8) & 0xffu);
     crc = CRC32UpdateByte(crc, (value >> 16) & 0xffu);
     return CRC32UpdateByte(crc, (value >> 24) & 0xffu);
+}
+
+uint PStoEP_CalculateChecksum(
+    PSTOEP_PROVIDER_CONTEXT_TYPE providerContext,
+    uint timeWord,
+    uint4 cameraPosition,
+    uint4 cameraEuler)
+{
+    uint crc = 0xffffffffu;
+    [loop]
+    for (int word = GROUP_Time; word < GROUP_LENGTH; word++)
+    {
+        crc = CRC32UpdateUint(
+            crc,
+            PStoEP_GetData(word, providerContext, timeWord, cameraPosition, cameraEuler));
+    }
+    return crc ^ 0xffffffffu;
 }
 
 v2f vert(appdata input)
@@ -237,6 +264,23 @@ v2f vert(appdata input)
     output.uv = output.uv * float2(SERIALIZE_NumberOfColumns + MARGIN * 2, lineCount + MARGIN * 2)
         - float2(MARGIN, MARGIN);
     PSTOEP_PROVIDER_VERTEX_PREPARE(output)
+
+    // Snapshot every camera-dependent packet value after the vertex-stage eye
+    // index has been initialized. The fragment shader then serializes only these
+    // flat integer values, so checksum and payload pixels cannot evaluate stereo
+    // camera buffers or floating-point conversions through different FXC paths.
+    float3 cameraPosition = _WorldSpaceCameraPos;
+    float3 cameraEuler = PStoEP_GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
+    output.pstoepCameraPosition = PStoEP_SerializeCameraVector(cameraPosition, 1u << 12u);
+    output.pstoepCameraEuler = PStoEP_SerializeCameraVector(cameraEuler, 1u << 13u);
+    output.pstoepPacketInfo.x = asuint((float)_Time);
+
+    PSTOEP_PROVIDER_CONTEXT_TYPE packetProviderContext = PSTOEP_PROVIDER_CONTEXT_FROM_INPUT(output);
+    output.pstoepPacketInfo.y = PStoEP_CalculateChecksum(
+        packetProviderContext,
+        output.pstoepPacketInfo.x,
+        output.pstoepCameraPosition,
+        output.pstoepCameraEuler);
     return output;
 }
 
@@ -245,14 +289,6 @@ fixed4 frag(v2f input) : SV_Target
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
     PSTOEP_PROVIDER_CONTEXT_TYPE providerContext = PSTOEP_PROVIDER_CONTEXT_FROM_INPUT(input);
-
-    // Read the camera position and orientation once here: under single-pass
-    // stereo, _WorldSpaceCameraPos and UNITY_MATRIX_I_V are eye-indexed
-    // cbuffer arrays, and reading them inside the unrolled CRC loop below
-    // makes the D3D11 compiler emit invalid bytecode (X8000 "temp register
-    // ... uninitialized").
-    float3 cameraPos = _WorldSpaceCameraPos;
-    float3 cameraEuler = PStoEP_GetUnityEulerAngles((float3x3)UNITY_MATRIX_I_V);
 
     #if defined(USING_STEREO_MATRICES)
         // Only the left eye carries the encoded data.
@@ -286,18 +322,16 @@ fixed4 frag(v2f input) : SV_Target
     uint data;
     if (wordIndex < (uint)GROUP_Time)
     {
-        // Word 0 is the CRC of words 1 through 51. getData cannot recursively
-        // produce its own checksum, so the checksum word is handled here.
-        uint crc = 0xffffffffu;
-        for (int word = GROUP_Time; word < GROUP_LENGTH; word++)
-        {
-            crc = CRC32UpdateUint(crc, getData(word, providerContext, cameraPos, cameraEuler));
-        }
-        data = crc ^ 0xffffffffu;
+        data = input.pstoepPacketInfo.y;
     }
     else
     {
-        data = getData((int)wordIndex, providerContext, cameraPos, cameraEuler);
+        data = PStoEP_GetData(
+            (int)wordIndex,
+            providerContext,
+            input.pstoepPacketInfo.x,
+            input.pstoepCameraPosition,
+            input.pstoepCameraEuler);
     }
 
     return NthBit(data, bitIndex) != 0u
